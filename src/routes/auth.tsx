@@ -12,7 +12,7 @@ type Mode = "masuk" | "daftar" | "lupa";
 const safePath = (p: unknown) => (typeof p === "string" && p.startsWith("/") && !p.startsWith("//") ? p : "/kelas-saya");
 
 export const Route = createFileRoute("/auth")({
-  validateSearch: (s: Record<string, unknown>) => ({ redirect: typeof s.redirect === "string" ? s.redirect : undefined }),
+  validateSearch: (s: Record<string, unknown>): { redirect?: string } => (typeof s["redirect"] === "string" ? { redirect: s["redirect"] } : {}),
   head: () => ({
     meta: [
       { title: "Masuk atau Daftar — Bimbelajar" },
