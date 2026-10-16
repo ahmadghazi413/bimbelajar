@@ -14,6 +14,8 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthenticatedKelasSayaRouteImport } from './routes/_authenticated/kelas-saya'
+import { Route as AuthenticatedPembayaranRouteImport } from './routes/_authenticated/pembayaran'
+import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated/profil'
 import { Route as AuthenticatedVideoRouteImport } from './routes/_authenticated/video'
 import { Route as KelasIndexRouteImport } from './routes/kelas/index'
 import { Route as KelasSlugRouteImport } from './routes/kelas/$slug'
@@ -43,6 +45,16 @@ const AuthenticatedKelasSayaRoute = AuthenticatedKelasSayaRouteImport.update({
   path: '/kelas-saya',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPembayaranRoute = AuthenticatedPembayaranRouteImport.update({
+  id: '/pembayaran',
+  path: '/pembayaran',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedProfilRoute = AuthenticatedProfilRouteImport.update({
+  id: '/profil',
+  path: '/profil',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedVideoRoute = AuthenticatedVideoRouteImport.update({
   id: '/video',
   path: '/video',
@@ -69,6 +81,8 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/kelas-saya': typeof AuthenticatedKelasSayaRoute
+  '/pembayaran': typeof AuthenticatedPembayaranRoute
+  '/profil': typeof AuthenticatedProfilRoute
   '/video': typeof AuthenticatedVideoRoute
   '/kelas/$slug': typeof KelasSlugRoute
   '/kelas/': typeof KelasIndexRoute
@@ -79,6 +93,8 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/kelas-saya': typeof AuthenticatedKelasSayaRoute
+  '/pembayaran': typeof AuthenticatedPembayaranRoute
+  '/profil': typeof AuthenticatedProfilRoute
   '/video': typeof AuthenticatedVideoRoute
   '/kelas/$slug': typeof KelasSlugRoute
   '/kelas': typeof KelasIndexRoute
@@ -91,6 +107,8 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/kelas-saya': typeof AuthenticatedKelasSayaRoute
+  '/_authenticated/pembayaran': typeof AuthenticatedPembayaranRoute
+  '/_authenticated/profil': typeof AuthenticatedProfilRoute
   '/_authenticated/video': typeof AuthenticatedVideoRoute
   '/kelas/$slug': typeof KelasSlugRoute
   '/kelas/': typeof KelasIndexRoute
@@ -103,6 +121,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/kelas-saya'
+    | '/pembayaran'
+    | '/profil'
     | '/video'
     | '/kelas/$slug'
     | '/kelas/'
@@ -113,6 +133,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/kelas-saya'
+    | '/pembayaran'
+    | '/profil'
     | '/video'
     | '/kelas/$slug'
     | '/kelas'
@@ -124,6 +146,8 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/_authenticated/kelas-saya'
+    | '/_authenticated/pembayaran'
+    | '/_authenticated/profil'
     | '/_authenticated/video'
     | '/kelas/$slug'
     | '/kelas/'
@@ -176,6 +200,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedKelasSayaRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/pembayaran': {
+      id: '/_authenticated/pembayaran'
+      path: '/pembayaran'
+      fullPath: '/pembayaran'
+      preLoaderRoute: typeof AuthenticatedPembayaranRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/profil': {
+      id: '/_authenticated/profil'
+      path: '/profil'
+      fullPath: '/profil'
+      preLoaderRoute: typeof AuthenticatedProfilRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/video': {
       id: '/_authenticated/video'
       path: '/video'
@@ -209,12 +247,16 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedKelasSayaRoute: typeof AuthenticatedKelasSayaRoute
+  AuthenticatedPembayaranRoute: typeof AuthenticatedPembayaranRoute
+  AuthenticatedProfilRoute: typeof AuthenticatedProfilRoute
   AuthenticatedVideoRoute: typeof AuthenticatedVideoRoute
   AuthenticatedBayarSlugRoute: typeof AuthenticatedBayarSlugRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedKelasSayaRoute: AuthenticatedKelasSayaRoute,
+  AuthenticatedPembayaranRoute: AuthenticatedPembayaranRoute,
+  AuthenticatedProfilRoute: AuthenticatedProfilRoute,
   AuthenticatedVideoRoute: AuthenticatedVideoRoute,
   AuthenticatedBayarSlugRoute: AuthenticatedBayarSlugRoute,
 }
