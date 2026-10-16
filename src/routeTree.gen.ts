@@ -10,33 +10,53 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as KelasIndexRouteImport } from './routes/kelas/index'
+import { Route as KelasSlugRouteImport } from './routes/kelas/$slug'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KelasIndexRoute = KelasIndexRouteImport.update({
+  id: '/kelas/',
+  path: '/kelas/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KelasSlugRoute = KelasSlugRouteImport.update({
+  id: '/kelas/$slug',
+  path: '/kelas/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/kelas/$slug': typeof KelasSlugRoute
+  '/kelas/': typeof KelasIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/kelas/$slug': typeof KelasSlugRoute
+  '/kelas': typeof KelasIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/kelas/$slug': typeof KelasSlugRoute
+  '/kelas/': typeof KelasIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/kelas/$slug' | '/kelas/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/kelas/$slug' | '/kelas'
+  id: '__root__' | '/' | '/kelas/$slug' | '/kelas/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  KelasSlugRoute: typeof KelasSlugRoute
+  KelasIndexRoute: typeof KelasIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +68,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/kelas/': {
+      id: '/kelas/'
+      path: '/kelas'
+      fullPath: '/kelas/'
+      preLoaderRoute: typeof KelasIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kelas/$slug': {
+      id: '/kelas/$slug'
+      path: '/kelas/$slug'
+      fullPath: '/kelas/$slug'
+      preLoaderRoute: typeof KelasSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  KelasSlugRoute: KelasSlugRoute,
+  KelasIndexRoute: KelasIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
