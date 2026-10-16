@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedKelasSayaRouteImport } from './routes/_authenticated/kelas-saya'
 import { Route as AuthenticatedPembayaranRouteImport } from './routes/_authenticated/pembayaran'
 import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated/profil'
@@ -39,6 +40,11 @@ const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedKelasSayaRoute = AuthenticatedKelasSayaRouteImport.update({
   id: '/kelas-saya',
@@ -80,6 +86,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/kelas-saya': typeof AuthenticatedKelasSayaRoute
   '/pembayaran': typeof AuthenticatedPembayaranRoute
   '/profil': typeof AuthenticatedProfilRoute
@@ -92,6 +99,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/kelas-saya': typeof AuthenticatedKelasSayaRoute
   '/pembayaran': typeof AuthenticatedPembayaranRoute
   '/profil': typeof AuthenticatedProfilRoute
@@ -106,6 +114,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/kelas-saya': typeof AuthenticatedKelasSayaRoute
   '/_authenticated/pembayaran': typeof AuthenticatedPembayaranRoute
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
@@ -120,6 +129,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/reset-password'
+    | '/admin'
     | '/kelas-saya'
     | '/pembayaran'
     | '/profil'
@@ -132,6 +142,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/reset-password'
+    | '/admin'
     | '/kelas-saya'
     | '/pembayaran'
     | '/profil'
@@ -145,6 +156,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/reset-password'
+    | '/_authenticated/admin'
     | '/_authenticated/kelas-saya'
     | '/_authenticated/pembayaran'
     | '/_authenticated/profil'
@@ -192,6 +204,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/kelas-saya': {
       id: '/_authenticated/kelas-saya'
@@ -246,6 +265,7 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedKelasSayaRoute: typeof AuthenticatedKelasSayaRoute
   AuthenticatedPembayaranRoute: typeof AuthenticatedPembayaranRoute
   AuthenticatedProfilRoute: typeof AuthenticatedProfilRoute
@@ -254,6 +274,7 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedKelasSayaRoute: AuthenticatedKelasSayaRoute,
   AuthenticatedPembayaranRoute: AuthenticatedPembayaranRoute,
   AuthenticatedProfilRoute: AuthenticatedProfilRoute,
