@@ -104,9 +104,9 @@ function KelolaKelas() {
     const res = rest.id
       ? await supabase.from("classes").update(payload).eq("id", rest.id).select().single()
       : await supabase.from("classes").insert(payload).select().single();
-    if (res.error) return toast.error(res.error.message);
+    if (res.error) { toast.error(res.error.message); return; }
     const { error } = await supabase.from("class_private").upsert({ class_id: res.data.id, whatsapp_link, zoom_link });
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success("Kelas disimpan.");
     setEdit(null);
     qc.invalidateQueries();
@@ -132,7 +132,7 @@ function KelolaKelas() {
             <p className="font-semibold">{c.name} {!c.is_active && <span className="text-xs text-muted-foreground">(nonaktif)</span>}</p>
             <p className="text-sm text-muted-foreground">{c.price_prefix} {rupiah(c.price)} · kuota {c.quota}</p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setEdit({ ...c, whatsapp_link: c.class_private?.whatsapp_link, zoom_link: c.class_private?.zoom_link })}>Ubah</Button>
+          <Button variant="outline" size="sm" onClick={() => setEdit({ ...c, whatsapp_link: c.class_private?.whatsapp_link ?? "", zoom_link: c.class_private?.zoom_link ?? "" })}>Ubah</Button>
         </div>
       ))}
       <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
@@ -180,7 +180,7 @@ function KelolaSesi() {
     const level = last ? (last.number >= 16 ? last.level + 1 : last.level) : 1;
     const number = last ? (last.number >= 16 ? 1 : last.number + 1) : 1;
     const { error } = await supabase.from("class_sessions").insert({ class_id: classId, level, number, title: "Sesi baru" });
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     qc.invalidateQueries({ queryKey: ["admin-sesi", classId] });
   }
 
@@ -198,11 +198,11 @@ function SessionRow({ s, classId }: { s: Tables<"class_sessions"> & { video_url:
   const qc = useQueryClient();
   async function save() {
     const { error } = await supabase.from("class_sessions").update({ title: v.title, description: v.description, scheduled_at: v.scheduled_at, level: Number(v.level), number: Number(v.number) }).eq("id", s.id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     const r = v.video_url.trim()
       ? await supabase.from("session_recordings").upsert({ session_id: s.id, class_id: classId, video_url: v.video_url.trim() })
       : await supabase.from("session_recordings").delete().eq("session_id", s.id);
-    if (r.error) return toast.error(r.error.message);
+    if (r.error) { toast.error(r.error.message); return; }
     toast.success(`Sesi ${v.number} disimpan.`);
     qc.invalidateQueries({ queryKey: ["admin-sesi", classId] });
   }
@@ -240,7 +240,7 @@ function Peserta() {
 
   async function setStatus(id: string, status: "paid" | "rejected") {
     const { error } = await supabase.from("enrollments").update({ status }).eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; }
     toast.success(status === "paid" ? "Pembayaran dikonfirmasi." : "Pembayaran ditolak.");
     qc.invalidateQueries();
   }

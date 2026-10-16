@@ -45,7 +45,7 @@ function Bayar() {
       user_id: userId, class_id: c!.id, amount: c!.price, method: `Transfer ${BANK.bank}`, sender_name: sender,
     });
     setBusy(false);
-    if (error) return toast.error("Gagal mendaftar: " + error.message);
+    if (error) { toast.error("Gagal mendaftar: " + error.message); return; }
     toast.success("Pendaftaran tercatat. Silakan transfer.");
     qc.invalidateQueries({ queryKey: ["my-enrollment", slug] });
   }
