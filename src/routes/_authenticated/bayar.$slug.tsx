@@ -32,9 +32,9 @@ function Bayar() {
   const { data: c } = useQuery(classDetailQuery(slug));
   const { data: settings } = useQuery(settingsQuery);
   const { data: qris } = useQuery({
-    queryKey: ["qris", settings?.qris_image_url],
+    queryKey: ["qris", settings?.["qris_image_url"]],
     enabled: !!settings,
-    queryFn: () => qrisUrl(settings!.qris_image_url ?? ""),
+    queryFn: () => qrisUrl(settings!["qris_image_url"] ?? ""),
   });
   const enr = useQuery({
     queryKey: ["my-enrollment", slug],
@@ -50,7 +50,7 @@ function Bayar() {
 
   if (!c) return <Page title="Memuat...">{null}</Page>;
   const e = enr.data;
-  const wa = settings?.admin_whatsapp ? `https://wa.me/${settings.admin_whatsapp}` : "";
+  const wa = settings?.["admin_whatsapp"] ? `https://wa.me/${settings["admin_whatsapp"]}` : "";
 
   async function daftar() {
     setBusy(true);
