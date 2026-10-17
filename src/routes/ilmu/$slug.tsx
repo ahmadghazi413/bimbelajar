@@ -69,8 +69,7 @@ function IlmuPage() {
               ))}
             </div>
           </div>
-                       </div>
-      </div>
+                       
       );
     })}
  
