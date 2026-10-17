@@ -69,9 +69,11 @@ function IlmuPage() {
               ))}
             </div>
           </div>
-                </div>
+                       </div>
       </div>
-    ))}
+      );
+    })}
+ 
 
         {groups.size === 0 && <p className="text-muted-foreground">Belum ada kelas untuk ilmu ini.</p>}
       </div>
