@@ -18,6 +18,7 @@ import { Route as AuthenticatedKelasSayaRouteImport } from './routes/_authentica
 import { Route as AuthenticatedPembayaranRouteImport } from './routes/_authenticated/pembayaran'
 import { Route as AuthenticatedProfilRouteImport } from './routes/_authenticated/profil'
 import { Route as AuthenticatedVideoRouteImport } from './routes/_authenticated/video'
+import { Route as IlmuSlugRouteImport } from './routes/ilmu/$slug'
 import { Route as KelasIndexRouteImport } from './routes/kelas/index'
 import { Route as KelasSlugRouteImport } from './routes/kelas/$slug'
 import { Route as AuthenticatedBayarSlugRouteImport } from './routes/_authenticated/bayar.$slug'
@@ -66,6 +67,11 @@ const AuthenticatedVideoRoute = AuthenticatedVideoRouteImport.update({
   path: '/video',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const IlmuSlugRoute = IlmuSlugRouteImport.update({
+  id: '/ilmu/$slug',
+  path: '/ilmu/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KelasIndexRoute = KelasIndexRouteImport.update({
   id: '/kelas/',
   path: '/kelas/',
@@ -91,6 +97,7 @@ export interface FileRoutesByFullPath {
   '/pembayaran': typeof AuthenticatedPembayaranRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/video': typeof AuthenticatedVideoRoute
+  '/ilmu/$slug': typeof IlmuSlugRoute
   '/kelas/$slug': typeof KelasSlugRoute
   '/kelas/': typeof KelasIndexRoute
   '/bayar/$slug': typeof AuthenticatedBayarSlugRoute
@@ -104,6 +111,7 @@ export interface FileRoutesByTo {
   '/pembayaran': typeof AuthenticatedPembayaranRoute
   '/profil': typeof AuthenticatedProfilRoute
   '/video': typeof AuthenticatedVideoRoute
+  '/ilmu/$slug': typeof IlmuSlugRoute
   '/kelas/$slug': typeof KelasSlugRoute
   '/kelas': typeof KelasIndexRoute
   '/bayar/$slug': typeof AuthenticatedBayarSlugRoute
@@ -119,6 +127,7 @@ export interface FileRoutesById {
   '/_authenticated/pembayaran': typeof AuthenticatedPembayaranRoute
   '/_authenticated/profil': typeof AuthenticatedProfilRoute
   '/_authenticated/video': typeof AuthenticatedVideoRoute
+  '/ilmu/$slug': typeof IlmuSlugRoute
   '/kelas/$slug': typeof KelasSlugRoute
   '/kelas/': typeof KelasIndexRoute
   '/_authenticated/bayar/$slug': typeof AuthenticatedBayarSlugRoute
@@ -134,6 +143,7 @@ export interface FileRouteTypes {
     | '/pembayaran'
     | '/profil'
     | '/video'
+    | '/ilmu/$slug'
     | '/kelas/$slug'
     | '/kelas/'
     | '/bayar/$slug'
@@ -147,6 +157,7 @@ export interface FileRouteTypes {
     | '/pembayaran'
     | '/profil'
     | '/video'
+    | '/ilmu/$slug'
     | '/kelas/$slug'
     | '/kelas'
     | '/bayar/$slug'
@@ -161,6 +172,7 @@ export interface FileRouteTypes {
     | '/_authenticated/pembayaran'
     | '/_authenticated/profil'
     | '/_authenticated/video'
+    | '/ilmu/$slug'
     | '/kelas/$slug'
     | '/kelas/'
     | '/_authenticated/bayar/$slug'
@@ -171,6 +183,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  IlmuSlugRoute: typeof IlmuSlugRoute
   KelasSlugRoute: typeof KelasSlugRoute
   KelasIndexRoute: typeof KelasIndexRoute
 }
@@ -240,6 +253,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedVideoRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/ilmu/$slug': {
+      id: '/ilmu/$slug'
+      path: '/ilmu/$slug'
+      fullPath: '/ilmu/$slug'
+      preLoaderRoute: typeof IlmuSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/kelas/': {
       id: '/kelas/'
       path: '/kelas'
@@ -290,6 +310,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  IlmuSlugRoute: IlmuSlugRoute,
   KelasSlugRoute: KelasSlugRoute,
   KelasIndexRoute: KelasIndexRoute,
 }
