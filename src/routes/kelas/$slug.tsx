@@ -30,8 +30,11 @@ function Detail() {
   if (!c) return null;
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 pb-28">
-      <Link to="/kelas" className="text-sm text-primary">← Semua kelas</Link>
+      <Link to="/kelas" className="text-sm text-primary">← Semua ilmu</Link>
       <h1 className="mt-3 text-4xl font-semibold text-primary">{c.name}</h1>
+      <p className="mt-1 inline-block rounded-full bg-secondary px-3 py-1 text-sm font-semibold text-secondary-foreground">
+        Level {c.level_number} · {c.level_label}
+      </p>
       <p className="mt-2 text-lg text-muted-foreground">{c.tagline}</p>
 
       <div className="mt-6 grid gap-3 rounded-2xl bg-secondary p-5 text-secondary-foreground">

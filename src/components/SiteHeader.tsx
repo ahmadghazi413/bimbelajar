@@ -51,11 +51,14 @@ export function SiteHeader() {
                   <Link to="/video" className={item}>Riwayat Video</Link>
                   <Link to="/pembayaran" className={item}>Riwayat Pembayaran</Link>
                   <Link to="/profil" className={item}>Profil</Link>
-                  {isAdmin && <Link to="/admin" className={`${item} text-primary`}>Panel Admin</Link>}
+              {isAdmin && <Link to="/admin" className={`${item} text-primary`}>Panel Admin</Link>}
                 </>
               ) : (
                 <Link to="/auth" className={item}>Masuk / Daftar</Link>
               )}
+              <a href="https://wa.me/62881022392900" target="_blank" rel="noreferrer" className={`${item} flex items-center gap-2`}>
+                <MessageCircle className="h-5 w-5 text-primary" /> Bantuan Admin
+              </a>
             </nav>
             {session && (
               <Button variant="outline" className="mt-6 w-full" onClick={logout}>Keluar</Button>
