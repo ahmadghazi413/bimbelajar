@@ -335,6 +335,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      submit_proof: {
+        Args: { _enrollment_id: string; _proof_url: string }
+        Returns: undefined
+      }
     }
     Enums: {
       app_role: "admin" | "student"
