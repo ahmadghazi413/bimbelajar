@@ -7,7 +7,7 @@ export function tanggal(iso: string | null | undefined) {
   return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 }
 
-/** Ubah link YouTube / Vimeo / Google Drive menjadi URL embed untuk iframe. */
+/** Ubah link YouTube / Vimeo / Google Drive / Dailymotion menjadi URL embed untuk iframe. */
 export function toEmbedUrl(url: string): string | null {
   const u = url.trim();
   let m = u.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/)|youtu\.be\/)([\w-]{11})/);
