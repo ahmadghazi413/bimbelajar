@@ -85,6 +85,8 @@ export type Database = {
           goals: string
           id: string
           is_active: boolean
+          level_label: string
+          level_number: number
           levels_label: string
           name: string
           price: number
@@ -93,6 +95,7 @@ export type Database = {
           schedule: string
           slug: string
           sort_order: number
+          subject_id: string | null
           tagline: string
         }
         Insert: {
@@ -101,6 +104,8 @@ export type Database = {
           goals?: string
           id?: string
           is_active?: boolean
+          level_label?: string
+          level_number?: number
           levels_label?: string
           name: string
           price?: number
@@ -109,6 +114,7 @@ export type Database = {
           schedule?: string
           slug: string
           sort_order?: number
+          subject_id?: string | null
           tagline?: string
         }
         Update: {
@@ -117,6 +123,8 @@ export type Database = {
           goals?: string
           id?: string
           is_active?: boolean
+          level_label?: string
+          level_number?: number
           levels_label?: string
           name?: string
           price?: number
@@ -125,9 +133,18 @@ export type Database = {
           schedule?: string
           slug?: string
           sort_order?: number
+          subject_id?: string | null
           tagline?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "classes_subject_id_fkey"
+            columns: ["subject_id"]
+            isOneToOne: false
+            referencedRelation: "subjects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       enrollments: {
         Row: {
@@ -138,6 +155,7 @@ export type Database = {
           method: string
           note: string | null
           paid_at: string | null
+          proof_url: string | null
           sender_name: string | null
           status: Database["public"]["Enums"]["payment_status"]
           user_id: string
@@ -150,6 +168,7 @@ export type Database = {
           method?: string
           note?: string | null
           paid_at?: string | null
+          proof_url?: string | null
           sender_name?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           user_id: string
@@ -162,6 +181,7 @@ export type Database = {
           method?: string
           note?: string | null
           paid_at?: string | null
+          proof_url?: string | null
           sender_name?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           user_id?: string
@@ -239,6 +259,48 @@ export type Database = {
           },
         ]
       }
+      settings: {
+        Row: {
+          key: string
+          value: string
+        }
+        Insert: {
+          key: string
+          value?: string
+        }
+        Update: {
+          key?: string
+          value?: string
+        }
+        Relationships: []
+      }
+      subjects: {
+        Row: {
+          bio: string
+          id: string
+          is_active: boolean
+          name: string
+          slug: string
+          sort_order: number
+        }
+        Insert: {
+          bio?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          slug: string
+          sort_order?: number
+        }
+        Update: {
+          bio?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          slug?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -272,6 +334,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      submit_proof: {
+        Args: { _enrollment_id: string; _proof_url: string }
+        Returns: undefined
       }
     }
     Enums: {

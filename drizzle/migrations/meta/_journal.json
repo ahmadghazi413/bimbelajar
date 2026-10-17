@@ -8,6 +8,34 @@
       "when": 1792174703764,
       "tag": "0000_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792195644716,
+      "tag": "0001_subjects_levels_settings_proofs",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792195676372,
+      "tag": "0002_storage_policies_proofs",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792195691392,
+      "tag": "0003_qris_storage_policy",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792195708935,
+      "tag": "0004_submit_proof_function",
+      "breakpoints": true
     }
   ]
 }
