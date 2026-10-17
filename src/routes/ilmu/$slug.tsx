@@ -42,12 +42,15 @@ function IlmuPage() {
       <p className="mt-2 leading-relaxed text-muted-foreground">{data.subject.bio}</p>
 
       <div className="mt-8 space-y-6">
-        {[...groups.entries()].map(([name, levels]) => (
+        {[...groups.entries()].map(([name, levels]) => {
+          const first = levels[0];
+          if (!first) return null;
+          return (
           <div key={name} className="rounded-3xl border bg-card p-6 shadow-sm">
             <h2 className="text-2xl font-semibold">{name}</h2>
             <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1"><CalendarDays className="h-4 w-4" /> {levels[0].schedule}</span>
-              <span className="flex items-center gap-1"><Users className="h-4 w-4" /> Kuota {levels[0].quota} orang</span>
+              <span className="flex items-center gap-1"><CalendarDays className="h-4 w-4" /> {first.schedule}</span>
+              <span className="flex items-center gap-1"><Users className="h-4 w-4" /> Kuota {first.quota} orang</span>
             </p>
             <div className="mt-4 space-y-2">
               {levels.map((c) => (
