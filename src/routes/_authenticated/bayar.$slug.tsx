@@ -45,15 +45,35 @@ function Bayar() {
   });
   const [sender, setSender] = useState("");
   const [busy, setBusy] = useState(false);
+  const [voucher, setVoucher] = useState("");
+  const [applied, setApplied] = useState<{ code: string; discount: number; final: number } | null>(null);
 
   if (!c) return <Page title="Memuat...">{null}</Page>;
   const e = enr.data;
   const wa = settings?.["admin_whatsapp"] ? `https://wa.me/${settings["admin_whatsapp"]}` : "";
+  const bank = {
+    bank: settings?.["bank_name"] || "BCA",
+    number: settings?.["bank_number"] || "1234567890",
+    holder: settings?.["bank_holder"] || "Yayasan Bimbelajar",
+  };
+  const finalPrice = applied ? applied.final : c.price;
+
+  async function terapkanVoucher() {
+    if (!voucher.trim()) return;
+    setBusy(true);
+    const { data, error } = await supabase.rpc("validate_voucher", { _code: voucher.trim(), _price: c!.price });
+    setBusy(false);
+    const row = data?.[0];
+    if (error || !row) { toast.error("Kode voucher tidak valid atau sudah habis."); setApplied(null); return; }
+    setApplied({ code: row.voucher_code, discount: row.discount, final: row.final_amount });
+    toast.success(`Voucher ${row.voucher_code} dipakai. Diskon ${rupiah(row.discount)}.`);
+  }
 
   async function daftar() {
     setBusy(true);
     const { error } = await supabase.from("enrollments").insert({
-      user_id: userId, class_id: c!.id, amount: c!.price, method: `Transfer ${BANK.bank}`, sender_name: sender,
+      user_id: userId, class_id: c!.id, amount: finalPrice, method: `Transfer ${bank.bank}`, sender_name: sender,
+      voucher_code: applied?.code ?? null,
     });
     setBusy(false);
     if (error) { toast.error("Gagal mendaftar: " + error.message); return; }
