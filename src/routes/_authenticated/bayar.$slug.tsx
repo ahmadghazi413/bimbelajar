@@ -106,7 +106,7 @@ function Bayar() {
             </>
           ) : (
             <>
-              <TransferInfo amount={e.amount} qris={qris ?? ""} />
+              <TransferInfo amount={e.amount} qris={qris ?? ""} bank={bank} />
               <ProofUpload busy={busy} hasProof={!!e.proof_url} onPick={uploadProof} />
               <p className="text-sm text-muted-foreground">Setelah transfer dan mengirim bukti, admin akan mengecek dan mengaktifkan kelas Anda (biasanya kurang dari 1×24 jam).</p>
             </>
@@ -144,13 +144,13 @@ function Bayar() {
   );
 }
 
-function TransferInfo({ amount, qris }: { amount: number; qris: string }) {
+function TransferInfo({ amount, qris, bank }: { amount: number; qris: string; bank: { bank: string; number: string; holder: string } }) {
   return (
     <div className="space-y-3">
       <div className="rounded-2xl bg-secondary p-4 text-secondary-foreground">
-        <p className="flex items-center gap-2 font-semibold"><Landmark className="h-5 w-5" /> Transfer ke rekening {BANK.bank}</p>
-        <p className="mt-2 font-display text-2xl tracking-wider">{BANK.number}</p>
-        <p className="text-sm">a.n. {BANK.holder}</p>
+        <p className="flex items-center gap-2 font-semibold"><Landmark className="h-5 w-5" /> Transfer ke rekening {bank.bank}</p>
+        <p className="mt-2 font-display text-2xl tracking-wider">{bank.number}</p>
+        <p className="text-sm">a.n. {bank.holder}</p>
         <p className="mt-3 text-sm">Jumlah: <b>{rupiah(amount)}</b></p>
       </div>
       <div className="rounded-2xl border p-4">
