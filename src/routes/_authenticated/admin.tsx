@@ -270,6 +270,8 @@ function Peserta() {
             </div>
             <StatusBadge status={x.status} />
           </div>
+          {x.voucher_code && <p className="text-sm text-muted-foreground">Voucher: {x.voucher_code}</p>}
+          {x.proof_url && <ProofLink path={x.proof_url} />}
           {x.status === "pending" && (
             <div className="flex gap-2">
               <Button size="sm" variant="success" onClick={() => setStatus(x.id, "paid")}>Konfirmasi lunas</Button>
@@ -291,6 +293,222 @@ function ProgressEditor({ p, onSave }: { p: Tables<"profiles">; onSave: (id: str
       <div className="w-20"><Label className="text-xs">Level</Label><Input type="number" value={level} onChange={(e) => setLevel(Number(e.target.value))} /></div>
       <div className="flex-1"><Label className="text-xs">Hasil tes</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
       <Button size="sm" variant="secondary" onClick={() => onSave(p.id, level, notes)}>Simpan</Button>
+    </div>
+  );
+}
+
+function ProofLink({ path }: { path: string }) {
+  const { data } = useQuery({
+    queryKey: ["proof", path],
+    queryFn: async () => {
+      const { data } = await supabase.storage.from("payment-proofs").createSignedUrl(path, 3600);
+      return data?.signedUrl ?? "";
+    },
+  });
+  if (!data) return null;
+  return (
+    <a href={data} target="_blank" rel="noreferrer" className="inline-block text-sm font-medium text-primary underline">
+      Lihat bukti pembayaran
+    </a>
+  );
+}
+
+type SubjectForm = Partial<Tables<"subjects">>;
+
+function KelolaIlmu() {
+  const qc = useQueryClient();
+  const [edit, setEdit] = useState<SubjectForm | null>(null);
+  const { data } = useQuery({
+    queryKey: ["admin-subjects"],
+    queryFn: async () => {
+      const { data } = await supabase.from("subjects").select("*").order("sort_order");
+      return data ?? [];
+    },
+  });
+
+  async function save() {
+    if (!edit) return;
+    const payload = {
+      slug: edit.slug || (edit.name ?? "ilmu").toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+      name: edit.name ?? "", bio: edit.bio ?? "",
+      sort_order: edit.sort_order ?? 99, is_active: edit.is_active ?? true,
+    };
+    const res = edit.id
+      ? await supabase.from("subjects").update(payload).eq("id", edit.id)
+      : await supabase.from("subjects").insert(payload);
+    if (res.error) { toast.error(res.error.message); return; }
+    toast.success("Ilmu disimpan.");
+    setEdit(null);
+    qc.invalidateQueries();
+  }
+
+  return (
+    <div className="mt-4 space-y-3">
+      <Button onClick={() => setEdit({ is_active: true })}>+ Tambah ilmu</Button>
+      {data?.map((s) => (
+        <div key={s.id} className="flex items-center justify-between rounded-2xl border bg-card p-4">
+          <div>
+            <p className="font-semibold">{s.name} {!s.is_active && <span className="text-xs text-muted-foreground">(nonaktif)</span>}</p>
+            <p className="line-clamp-2 text-sm text-muted-foreground">{s.bio}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setEdit(s)}>Ubah</Button>
+        </div>
+      ))}
+      <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{edit?.id ? "Ubah ilmu" : "Ilmu baru"}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1"><Label>Nama ilmu</Label><Input value={edit?.name ?? ""} onChange={(e) => setEdit({ ...edit!, name: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Deskripsi / bio</Label><Textarea value={edit?.bio ?? ""} onChange={(e) => setEdit({ ...edit!, bio: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Urutan tampil</Label><Input type="number" value={edit?.sort_order ?? 0} onChange={(e) => setEdit({ ...edit!, sort_order: Number(e.target.value) })} /></div>
+            <div className="flex items-center gap-2"><Switch checked={edit?.is_active ?? true} onCheckedChange={(v) => setEdit({ ...edit!, is_active: v })} /><Label>Tampilkan ke publik</Label></div>
+            <Button className="w-full" onClick={save}>Simpan</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+type VoucherForm = Partial<Tables<"vouchers">>;
+
+function KelolaVoucher() {
+  const qc = useQueryClient();
+  const [edit, setEdit] = useState<VoucherForm | null>(null);
+  const { data } = useQuery({
+    queryKey: ["admin-vouchers"],
+    queryFn: async () => {
+      const { data } = await supabase.from("vouchers").select("*").order("created_at", { ascending: false });
+      return data ?? [];
+    },
+  });
+
+  async function save() {
+    if (!edit) return;
+    if (!edit.code?.trim()) { toast.error("Kode voucher wajib diisi."); return; }
+    const payload = {
+      code: edit.code.trim().toUpperCase(),
+      discount_type: edit.discount_type ?? "percent",
+      discount_value: Number(edit.discount_value ?? 0),
+      max_uses: edit.max_uses ? Number(edit.max_uses) : null,
+      is_active: edit.is_active ?? true,
+      expires_at: edit.expires_at || null,
+    };
+    const res = edit.id
+      ? await supabase.from("vouchers").update(payload).eq("id", edit.id)
+      : await supabase.from("vouchers").insert(payload);
+    if (res.error) { toast.error(res.error.message); return; }
+    toast.success("Voucher disimpan.");
+    setEdit(null);
+    qc.invalidateQueries({ queryKey: ["admin-vouchers"] });
+  }
+
+  return (
+    <div className="mt-4 space-y-3">
+      <Button onClick={() => setEdit({ is_active: true, discount_type: "percent", discount_value: 10 })}>+ Tambah voucher</Button>
+      {data?.length === 0 && <p className="text-muted-foreground">Belum ada voucher.</p>}
+      {data?.map((v) => (
+        <div key={v.id} className="flex items-center justify-between rounded-2xl border bg-card p-4">
+          <div>
+            <p className="font-semibold">
+              {v.code} {!v.is_active && <span className="text-xs text-muted-foreground">(nonaktif)</span>}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Diskon {v.discount_type === "percent" ? `${v.discount_value}%` : rupiah(v.discount_value)}
+              {" · "}terpakai {v.used_count}{v.max_uses ? `/${v.max_uses}` : ""}
+              {v.expires_at ? ` · s.d. ${tanggal(v.expires_at)}` : ""}
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setEdit({ ...v, expires_at: v.expires_at ? v.expires_at.slice(0, 10) : "" })}>Ubah</Button>
+        </div>
+      ))}
+      <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{edit?.id ? "Ubah voucher" : "Voucher baru"}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1"><Label>Kode voucher</Label><Input value={edit?.code ?? ""} onChange={(e) => setEdit({ ...edit!, code: e.target.value })} placeholder="Contoh: AJAKTEMAN" /></div>
+            <div className="space-y-1">
+              <Label>Jenis diskon</Label>
+              <select value={edit?.discount_type ?? "percent"} onChange={(e) => setEdit({ ...edit!, discount_type: e.target.value })} className="h-11 w-full rounded-xl border bg-card px-3">
+                <option value="percent">Persen (%)</option>
+                <option value="fixed">Potongan harga (Rp)</option>
+              </select>
+            </div>
+            <div className="space-y-1"><Label>Nilai diskon {edit?.discount_type === "fixed" ? "(Rp)" : "(%)"}</Label><Input type="number" value={edit?.discount_value ?? 0} onChange={(e) => setEdit({ ...edit!, discount_value: Number(e.target.value) })} /></div>
+            <div className="space-y-1"><Label>Batas pemakaian (kosongkan = tanpa batas)</Label><Input type="number" value={edit?.max_uses ?? ""} onChange={(e) => setEdit({ ...edit!, max_uses: e.target.value ? Number(e.target.value) : null })} /></div>
+            <div className="space-y-1"><Label>Berlaku sampai (kosongkan = selamanya)</Label><Input type="date" value={edit?.expires_at ?? ""} onChange={(e) => setEdit({ ...edit!, expires_at: e.target.value })} /></div>
+            <div className="flex items-center gap-2"><Switch checked={edit?.is_active ?? true} onCheckedChange={(v) => setEdit({ ...edit!, is_active: v })} /><Label>Aktif</Label></div>
+            <Button className="w-full" onClick={save}>Simpan</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+const SETTING_FIELDS = [
+  { key: "admin_whatsapp", label: "Nomor WhatsApp admin (mis. 62881022392900)" },
+  { key: "bank_name", label: "Nama bank (mis. BCA)" },
+  { key: "bank_number", label: "Nomor rekening" },
+  { key: "bank_holder", label: "Atas nama rekening" },
+] as const;
+
+function Pengaturan() {
+  const qc = useQueryClient();
+  const [vals, setVals] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const { data } = useQuery({
+    queryKey: ["admin-settings"],
+    queryFn: async () => {
+      const { data } = await supabase.from("settings").select("*");
+      const map: Record<string, string> = {};
+      for (const row of data ?? []) map[row.key] = row.value;
+      return map;
+    },
+  });
+  useEffect(() => { if (data) setVals(data); }, [data]);
+
+  async function saveSettings() {
+    setBusy(true);
+    for (const f of SETTING_FIELDS) {
+      const { error } = await supabase.from("settings").upsert({ key: f.key, value: vals[f.key] ?? "" });
+      if (error) { setBusy(false); toast.error(error.message); return; }
+    }
+    setBusy(false);
+    toast.success("Pengaturan disimpan.");
+    qc.invalidateQueries();
+  }
+
+  async function uploadQris(file: File) {
+    setBusy(true);
+    const path = `qris/qris-${Date.now()}-${file.name}`;
+    const up = await supabase.storage.from("payment-proofs").upload(path, file, { upsert: true });
+    if (up.error) { setBusy(false); toast.error("Gagal mengunggah: " + up.error.message); return; }
+    const { error } = await supabase.from("settings").upsert({ key: "qris_image_url", value: path });
+    setBusy(false);
+    if (error) { toast.error(error.message); return; }
+    toast.success("Gambar QRIS diperbarui.");
+    qc.invalidateQueries();
+  }
+
+  return (
+    <div className="mt-4 space-y-4">
+      {SETTING_FIELDS.map((f) => (
+        <div key={f.key} className="space-y-1">
+          <Label>{f.label}</Label>
+          <Input value={vals[f.key] ?? ""} onChange={(e) => setVals({ ...vals, [f.key]: e.target.value })} />
+        </div>
+      ))}
+      <Button onClick={saveSettings} disabled={busy}>Simpan pengaturan</Button>
+      <div className="rounded-2xl border border-dashed p-4">
+        <Label htmlFor="qris" className="flex cursor-pointer flex-col items-center gap-2 py-2 text-center">
+          <span className="font-semibold">Unggah gambar QRIS</span>
+          <span className="text-xs text-muted-foreground">Foto kode QRIS untuk halaman pembayaran (maks 5 MB)</span>
+        </Label>
+        <input id="qris" type="file" accept="image/*" className="hidden" disabled={busy}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadQris(f); e.target.value = ""; }} />
+        {vals["qris_image_url"] && <p className="mt-2 text-center text-xs text-muted-foreground">QRIS saat ini sudah terpasang.</p>}
+      </div>
     </div>
   );
 }
