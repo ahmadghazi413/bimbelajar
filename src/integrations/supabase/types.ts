@@ -159,6 +159,7 @@ export type Database = {
           sender_name: string | null
           status: Database["public"]["Enums"]["payment_status"]
           user_id: string
+          voucher_code: string | null
         }
         Insert: {
           amount: number
@@ -172,6 +173,7 @@ export type Database = {
           sender_name?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           user_id: string
+          voucher_code?: string | null
         }
         Update: {
           amount?: number
@@ -185,6 +187,7 @@ export type Database = {
           sender_name?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           user_id?: string
+          voucher_code?: string | null
         }
         Relationships: [
           {
@@ -319,6 +322,42 @@ export type Database = {
         }
         Relationships: []
       }
+      vouchers: {
+        Row: {
+          code: string
+          created_at: string
+          discount_type: string
+          discount_value: number
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          max_uses: number | null
+          used_count: number
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          discount_type?: string
+          discount_value?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          used_count?: number
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          discount_type?: string
+          discount_value?: number
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          max_uses?: number | null
+          used_count?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -338,6 +377,14 @@ export type Database = {
       submit_proof: {
         Args: { _enrollment_id: string; _proof_url: string }
         Returns: undefined
+      }
+      validate_voucher: {
+        Args: { _code: string; _price: number }
+        Returns: {
+          discount: number
+          final_amount: number
+          voucher_code: string
+        }[]
       }
     }
     Enums: {

@@ -17,8 +17,6 @@ export const Route = createFileRoute("/_authenticated/bayar/$slug")({
   component: Bayar,
 });
 
-const BANK = { bank: "BCA", number: "1234567890", holder: "Yayasan Bimbelajar" };
-
 async function qrisUrl(path: string) {
   if (!path) return "";
   const { data } = await supabase.storage.from("payment-proofs").createSignedUrl(path, 3600);
@@ -47,15 +45,35 @@ function Bayar() {
   });
   const [sender, setSender] = useState("");
   const [busy, setBusy] = useState(false);
+  const [voucher, setVoucher] = useState("");
+  const [applied, setApplied] = useState<{ code: string; discount: number; final: number } | null>(null);
 
   if (!c) return <Page title="Memuat...">{null}</Page>;
   const e = enr.data;
   const wa = settings?.["admin_whatsapp"] ? `https://wa.me/${settings["admin_whatsapp"]}` : "";
+  const bank = {
+    bank: settings?.["bank_name"] || "BCA",
+    number: settings?.["bank_number"] || "1234567890",
+    holder: settings?.["bank_holder"] || "Yayasan Bimbelajar",
+  };
+  const finalPrice = applied ? applied.final : c.price;
+
+  async function terapkanVoucher() {
+    if (!voucher.trim()) return;
+    setBusy(true);
+    const { data, error } = await supabase.rpc("validate_voucher", { _code: voucher.trim(), _price: c!.price });
+    setBusy(false);
+    const row = data?.[0];
+    if (error || !row) { toast.error("Kode voucher tidak valid atau sudah habis."); setApplied(null); return; }
+    setApplied({ code: row.voucher_code, discount: row.discount, final: row.final_amount });
+    toast.success(`Voucher ${row.voucher_code} dipakai. Diskon ${rupiah(row.discount)}.`);
+  }
 
   async function daftar() {
     setBusy(true);
     const { error } = await supabase.from("enrollments").insert({
-      user_id: userId, class_id: c!.id, amount: c!.price, method: `Transfer ${BANK.bank}`, sender_name: sender,
+      user_id: userId, class_id: c!.id, amount: finalPrice, method: `Transfer ${bank.bank}`, sender_name: sender,
+      voucher_code: applied?.code ?? null,
     });
     setBusy(false);
     if (error) { toast.error("Gagal mendaftar: " + error.message); return; }
@@ -88,7 +106,7 @@ function Bayar() {
             </>
           ) : (
             <>
-              <TransferInfo amount={e.amount} qris={qris ?? ""} />
+              <TransferInfo amount={e.amount} qris={qris ?? ""} bank={bank} />
               <ProofUpload busy={busy} hasProof={!!e.proof_url} onPick={uploadProof} />
               <p className="text-sm text-muted-foreground">Setelah transfer dan mengirim bukti, admin akan mengecek dan mengaktifkan kelas Anda (biasanya kurang dari 1×24 jam).</p>
             </>
@@ -97,7 +115,17 @@ function Bayar() {
       ) : (
         <div className="space-y-4 rounded-3xl border bg-card p-6">
           {e?.status === "rejected" && <p className="text-destructive">Pembayaran sebelumnya ditolak. Silakan daftar ulang.</p>}
-          <TransferInfo amount={c.price} qris={qris ?? ""} />
+          <div className="space-y-2">
+            <Label htmlFor="v">Punya kode voucher? (opsional)</Label>
+            <div className="flex gap-2">
+              <Input id="v" value={voucher} onChange={(ev) => { setVoucher(ev.target.value); setApplied(null); }} className="h-12" placeholder="Contoh: AJAKTEMAN" />
+              <Button variant="outline" className="h-12" disabled={busy || !voucher.trim()} onClick={terapkanVoucher}>Terapkan</Button>
+            </div>
+            {applied && (
+              <p className="text-sm text-success">Diskon {rupiah(applied.discount)} — total bayar jadi <b>{rupiah(applied.final)}</b></p>
+            )}
+          </div>
+          <TransferInfo amount={finalPrice} qris={qris ?? ""} bank={bank} />
           <div className="space-y-2">
             <Label htmlFor="s">Nama pemilik rekening pengirim</Label>
             <Input id="s" value={sender} onChange={(ev) => setSender(ev.target.value)} className="h-12" placeholder="Contoh: Siti Aminah" />
@@ -116,13 +144,13 @@ function Bayar() {
   );
 }
 
-function TransferInfo({ amount, qris }: { amount: number; qris: string }) {
+function TransferInfo({ amount, qris, bank }: { amount: number; qris: string; bank: { bank: string; number: string; holder: string } }) {
   return (
     <div className="space-y-3">
       <div className="rounded-2xl bg-secondary p-4 text-secondary-foreground">
-        <p className="flex items-center gap-2 font-semibold"><Landmark className="h-5 w-5" /> Transfer ke rekening {BANK.bank}</p>
-        <p className="mt-2 font-display text-2xl tracking-wider">{BANK.number}</p>
-        <p className="text-sm">a.n. {BANK.holder}</p>
+        <p className="flex items-center gap-2 font-semibold"><Landmark className="h-5 w-5" /> Transfer ke rekening {bank.bank}</p>
+        <p className="mt-2 font-display text-2xl tracking-wider">{bank.number}</p>
+        <p className="text-sm">a.n. {bank.holder}</p>
         <p className="mt-3 text-sm">Jumlah: <b>{rupiah(amount)}</b></p>
       </div>
       <div className="rounded-2xl border p-4">
