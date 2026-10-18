@@ -37,16 +37,22 @@ function Admin() {
   return (
     <Page title="Panel Admin">
       <Tabs defaultValue="dash">
-        <TabsList className="grid h-auto w-full grid-cols-4">
+        <TabsList className="flex h-auto w-full flex-wrap">
           <TabsTrigger value="dash">Ringkas</TabsTrigger>
           <TabsTrigger value="kelas">Kelas</TabsTrigger>
+          <TabsTrigger value="ilmu">Ilmu</TabsTrigger>
           <TabsTrigger value="sesi">Sesi</TabsTrigger>
           <TabsTrigger value="peserta">Peserta</TabsTrigger>
+          <TabsTrigger value="voucher">Voucher</TabsTrigger>
+          <TabsTrigger value="atur">Pengaturan</TabsTrigger>
         </TabsList>
         <TabsContent value="dash"><Dashboard /></TabsContent>
         <TabsContent value="kelas"><KelolaKelas /></TabsContent>
+        <TabsContent value="ilmu"><KelolaIlmu /></TabsContent>
         <TabsContent value="sesi"><KelolaSesi /></TabsContent>
         <TabsContent value="peserta"><Peserta /></TabsContent>
+        <TabsContent value="voucher"><KelolaVoucher /></TabsContent>
+        <TabsContent value="atur"><Pengaturan /></TabsContent>
       </Tabs>
     </Page>
   );
