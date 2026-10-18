@@ -115,7 +115,17 @@ function Bayar() {
       ) : (
         <div className="space-y-4 rounded-3xl border bg-card p-6">
           {e?.status === "rejected" && <p className="text-destructive">Pembayaran sebelumnya ditolak. Silakan daftar ulang.</p>}
-          <TransferInfo amount={c.price} qris={qris ?? ""} />
+          <div className="space-y-2">
+            <Label htmlFor="v">Punya kode voucher? (opsional)</Label>
+            <div className="flex gap-2">
+              <Input id="v" value={voucher} onChange={(ev) => { setVoucher(ev.target.value); setApplied(null); }} className="h-12" placeholder="Contoh: AJAKTEMAN" />
+              <Button variant="outline" className="h-12" disabled={busy || !voucher.trim()} onClick={terapkanVoucher}>Terapkan</Button>
+            </div>
+            {applied && (
+              <p className="text-sm text-success">Diskon {rupiah(applied.discount)} — total bayar jadi <b>{rupiah(applied.final)}</b></p>
+            )}
+          </div>
+          <TransferInfo amount={finalPrice} qris={qris ?? ""} bank={bank} />
           <div className="space-y-2">
             <Label htmlFor="s">Nama pemilik rekening pengirim</Label>
             <Input id="s" value={sender} onChange={(ev) => setSender(ev.target.value)} className="h-12" placeholder="Contoh: Siti Aminah" />
