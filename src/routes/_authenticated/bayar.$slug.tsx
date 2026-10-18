@@ -17,8 +17,6 @@ export const Route = createFileRoute("/_authenticated/bayar/$slug")({
   component: Bayar,
 });
 
-const BANK = { bank: "BCA", number: "1234567890", holder: "Yayasan Bimbelajar" };
-
 async function qrisUrl(path: string) {
   if (!path) return "";
   const { data } = await supabase.storage.from("payment-proofs").createSignedUrl(path, 3600);
