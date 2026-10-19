@@ -451,6 +451,7 @@ function KelolaVoucher() {
 }
 
 const SETTING_FIELDS = [
+  { key: "site_name", label: "Nama Website / Brand (mis. PadatIlmu)" },
   { key: "admin_whatsapp", label: "Nomor WhatsApp admin (mis. 62881022392900)" },
   { key: "bank_name", label: "Nama bank (mis. BCA)" },
   { key: "bank_number", label: "Nomor rekening" },
@@ -470,7 +471,10 @@ function Pengaturan() {
       return map;
     },
   });
-  useEffect(() => { if (data) setVals(data); }, [data]);
+
+  useEffect(() => {
+    if (data) setVals(data);
+  }, [data]);
 
   async function saveSettings() {
     setBusy(true);
@@ -480,7 +484,50 @@ function Pengaturan() {
     }
     setBusy(false);
     toast.success("Pengaturan disimpan.");
-    qc.invalidateQueries();
+    qc.invalidateQueries({ queryKey: ["settings"] });
+    qc.invalidateQueries({ queryKey: ["admin-settings"] });
+  }
+
+  async function uploadLogo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Ukuran logo maksimal 2 MB.");
+      return;
+    }
+    setBusy(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result as string;
+      const { error } = await supabase.from("settings").upsert({ key: "logo_url", value: base64 });
+      setBusy(false);
+      if (error) {
+        toast.error("Gagal mengunggah logo: " + error.message);
+        return;
+      }
+      toast.success("Logo berhasil diperbarui.");
+      qc.invalidateQueries({ queryKey: ["settings"] });
+      qc.invalidateQueries({ queryKey: ["admin-settings"] });
+    };
+    reader.onerror = () => {
+      setBusy(false);
+      toast.error("Gagal membaca file gambar.");
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }
+
+  async function removeLogo() {
+    setBusy(true);
+    const { error } = await supabase.from("settings").upsert({ key: "logo_url", value: "" });
+    setBusy(false);
+    if (error) {
+      toast.error("Gagal menghapus logo: " + error.message);
+      return;
+    }
+    toast.success("Logo dihapus (kembali ke ikon default).");
+    qc.invalidateQueries({ queryKey: ["settings"] });
+    qc.invalidateQueries({ queryKey: ["admin-settings"] });
   }
 
   async function uploadQris(file: File) {
@@ -500,19 +547,69 @@ function Pengaturan() {
       {SETTING_FIELDS.map((f) => (
         <div key={f.key} className="space-y-1">
           <Label>{f.label}</Label>
-          <Input value={vals[f.key] ?? ""} onChange={(e) => setVals({ ...vals, [f.key]: e.target.value })} />
+          <Input
+            value={vals[f.key] ?? ""}
+            placeholder={f.key === "site_name" ? "PadatIlmu" : ""}
+            onChange={(e) => setVals({ ...vals, [f.key]: e.target.value })}
+          />
         </div>
       ))}
       <Button onClick={saveSettings} disabled={busy}>Simpan pengaturan</Button>
+
+      {/* Bagian Upload Logo */}
+      <div className="rounded-2xl border border-dashed p-4">
+        <Label htmlFor="logo-input" className="flex cursor-pointer flex-col items-center gap-2 py-2 text-center">
+          <span className="font-semibold">Unggah Logo Website</span>
+          <span className="text-xs text-muted-foreground">Format PNG, JPG, atau SVG (maks 2 MB)</span>
+        </Label>
+        <input
+          id="logo-input"
+          type="file"
+          accept="image/*"
+          className="hidden"
+          disabled={busy}
+          onChange={uploadLogo}
+        />
+        {vals["logo_url"] ? (
+          <div className="mt-3 flex flex-col items-center gap-2">
+            <img
+              src={vals["logo_url"]}
+              alt="Logo Preview"
+              className="h-10 w-auto object-contain rounded border p-1 bg-background"
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={removeLogo}
+              disabled={busy}
+              className="text-destructive text-xs hover:bg-destructive/10"
+            >
+              Hapus Logo Khusus
+            </Button>
+          </div>
+        ) : (
+          <p className="mt-1 text-center text-xs text-muted-foreground">
+            Belum ada logo khusus (menggunakan ikon bawaan & nama "{vals["site_name"] || "PadatIlmu"}").
+          </p>
+        )}
+      </div>
+
+      {/* Bagian Upload QRIS */}
       <div className="rounded-2xl border border-dashed p-4">
         <Label htmlFor="qris" className="flex cursor-pointer flex-col items-center gap-2 py-2 text-center">
           <span className="font-semibold">Unggah gambar QRIS</span>
           <span className="text-xs text-muted-foreground">Foto kode QRIS untuk halaman pembayaran (maks 5 MB)</span>
         </Label>
-        <input id="qris" type="file" accept="image/*" className="hidden" disabled={busy}
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadQris(f); e.target.value = ""; }} />
+        <input
+          id="qris"
+          type="file"
+          accept="image/*"
+          className="hidden"
+          disabled={busy}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadQris(f); e.target.value = ""; }}
+        />
         {vals["qris_image_url"] && <p className="mt-2 text-center text-xs text-muted-foreground">QRIS saat ini sudah terpasang.</p>}
       </div>
     </div>
   );
-}
+          }
