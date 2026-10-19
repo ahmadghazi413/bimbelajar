@@ -27,7 +27,7 @@ describe.skipIf(!url || !key)("Authoritative referral rules", () => {
     const { data: original } = await service.from("referral_settings").select("*").maybeSingle();
     const ids: string[] = [];
     let classId = "";
-    const check = <T,>(r: { data: T; error: { message: string } | null }): T => {
+    const check = <R extends { data: unknown; error: { message: string } | null },>(r: R): R["data"] => {
       if (r.error) throw new Error(r.error.message);
       return r.data;
     };
