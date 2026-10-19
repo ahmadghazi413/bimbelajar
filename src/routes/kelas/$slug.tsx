@@ -14,6 +14,8 @@ export const Route = createFileRoute("/kelas/$slug")({
   },
   head: ({ loaderData }) => ({
     meta: [
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: loaderData ? `${loaderData.name} — Bimbelajar` : "Kelas — Bimbelajar" },
       { name: "description", content: loaderData?.tagline ?? "Detail kelas ngaji online." },
       { property: "og:title", content: loaderData ? `${loaderData.name} — Bimbelajar` : "Kelas — Bimbelajar" },

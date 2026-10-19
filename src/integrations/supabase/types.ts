@@ -156,8 +156,13 @@ export type Database = {
           note: string | null
           paid_at: string | null
           proof_url: string | null
+          referral_code: string | null
+          referral_reward_amount: number
+          referrer_id: string | null
+          reward_used: number
           sender_name: string | null
           status: Database["public"]["Enums"]["payment_status"]
+          use_referral_reward: boolean
           user_id: string
           voucher_code: string | null
         }
@@ -170,8 +175,13 @@ export type Database = {
           note?: string | null
           paid_at?: string | null
           proof_url?: string | null
+          referral_code?: string | null
+          referral_reward_amount?: number
+          referrer_id?: string | null
+          reward_used?: number
           sender_name?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
+          use_referral_reward?: boolean
           user_id: string
           voucher_code?: string | null
         }
@@ -184,8 +194,13 @@ export type Database = {
           note?: string | null
           paid_at?: string | null
           proof_url?: string | null
+          referral_code?: string | null
+          referral_reward_amount?: number
+          referrer_id?: string | null
+          reward_used?: number
           sender_name?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
+          use_referral_reward?: boolean
           user_id?: string
           voucher_code?: string | null
         }
@@ -223,6 +238,92 @@ export type Database = {
           id?: string
           phone?: string | null
           test_notes?: string | null
+        }
+        Relationships: []
+      }
+      referral_accounts: {
+        Row: {
+          code: string
+          user_id: string
+        }
+        Insert: {
+          code?: string
+          user_id: string
+        }
+        Update: {
+          code?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referral_rewards: {
+        Row: {
+          amount: number
+          created_at: string
+          source_enrollment_id: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          source_enrollment_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          source_enrollment_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referral_rewards_source_enrollment_id_fkey"
+            columns: ["source_enrollment_id"]
+            isOneToOne: true
+            referencedRelation: "enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referral_rewards_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "referral_accounts"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      referral_settings: {
+        Row: {
+          discount_type: string
+          discount_value: number
+          enabled: boolean
+          id: boolean
+          reward_amount: number
+          reward_enabled: boolean
+        }
+        Insert: {
+          discount_type?: string
+          discount_value?: number
+          enabled?: boolean
+          id?: boolean
+          reward_amount?: number
+          reward_enabled?: boolean
+        }
+        Update: {
+          discount_type?: string
+          discount_value?: number
+          enabled?: boolean
+          id?: boolean
+          reward_amount?: number
+          reward_enabled?: boolean
         }
         Relationships: []
       }
@@ -374,9 +475,22 @@ export type Database = {
         }
         Returns: boolean
       }
+      referral_balance: { Args: { _user_id: string }; Returns: number }
       submit_proof: {
         Args: { _enrollment_id: string; _proof_url: string }
         Returns: undefined
+      }
+      validate_discount: {
+        Args: { _class_id: string; _code: string; _use_reward?: boolean }
+        Returns: {
+          code: string
+          discount: number
+          final_amount: number
+          kind: string
+          referrer_id: string
+          reward_amount: number
+          reward_used: number
+        }[]
       }
       validate_voucher: {
         Args: { _code: string; _price: number }

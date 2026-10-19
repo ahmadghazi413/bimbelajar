@@ -8,3 +8,7 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+- Referral codes and credits live in protected referral tables; enrollment triggers authoritatively quote discounts, reserve credits and issue idempotent rewards after payment, so client input cannot grant discounts or rewards.
+- Referral settings default to zero discount with inviter rewards disabled until the administrator chooses amounts, avoiding unapproved financial commitments.
+- Referral codes apply once per invited account and never to their owner; credits are reserved by pending enrollments and released when rejected to prevent concurrent double spending.

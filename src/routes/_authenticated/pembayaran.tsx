@@ -5,7 +5,7 @@ import { rupiah, tanggal } from "@/lib/format";
 import { Page, StatusBadge } from "@/components/PageTitle";
 
 export const Route = createFileRoute("/_authenticated/pembayaran")({
-  head: () => ({ meta: [{ title: "Riwayat Pembayaran — Bimbelajar" }] }),
+  head: () => ({ meta: [{ title: "Riwayat Pembayaran — Bimbelajar" }, { name: "description", content: "Status dan riwayat pembayaran kelas Bimbelajar." }, { property: "og:title", content: "Riwayat Pembayaran — Bimbelajar" }, { property: "og:description", content: "Status dan riwayat pembayaran kelas Bimbelajar." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
   component: Riwayat,
 });
 

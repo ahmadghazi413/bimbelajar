@@ -14,9 +14,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ReferralSettings } from "@/components/ReferralSettings";
 
 export const Route = createFileRoute("/_authenticated/admin")({
-  head: () => ({ meta: [{ title: "Panel Admin — Bimbelajar" }] }),
+  head: () => ({ meta: [{ title: "Panel Admin — Bimbelajar" }, { name: "description", content: "Kelola kelas, peserta, voucher dan program referral Bimbelajar." }, { property: "og:title", content: "Panel Admin — Bimbelajar" }, { property: "og:description", content: "Kelola kelas, peserta, voucher dan program referral Bimbelajar." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
   component: Admin,
 });
 
@@ -44,6 +45,7 @@ function Admin() {
           <TabsTrigger value="sesi">Sesi</TabsTrigger>
           <TabsTrigger value="peserta">Peserta</TabsTrigger>
           <TabsTrigger value="voucher">Voucher</TabsTrigger>
+          <TabsTrigger value="referral">Referral</TabsTrigger>
           <TabsTrigger value="atur">Pengaturan</TabsTrigger>
         </TabsList>
         <TabsContent value="dash"><Dashboard /></TabsContent>
@@ -52,6 +54,7 @@ function Admin() {
         <TabsContent value="sesi"><KelolaSesi /></TabsContent>
         <TabsContent value="peserta"><Peserta /></TabsContent>
         <TabsContent value="voucher"><KelolaVoucher /></TabsContent>
+        <TabsContent value="referral"><ReferralSettings /></TabsContent>
         <TabsContent value="atur"><Pengaturan /></TabsContent>
       </Tabs>
     </Page>
@@ -271,6 +274,7 @@ function Peserta() {
             <StatusBadge status={x.status} />
           </div>
           {x.voucher_code && <p className="text-sm text-muted-foreground">Voucher: {x.voucher_code}</p>}
+          {x.referral_code && <p className="break-all text-sm text-muted-foreground">Referral: {x.referral_code} · Bonus pengajak: {rupiah(x.referral_reward_amount)}</p>}
           {x.proof_url && <ProofLink path={x.proof_url} />}
           {x.status === "pending" && (
             <div className="flex gap-2">
