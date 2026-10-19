@@ -16,7 +16,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { User, LogOut, BookOpen, ShieldCheck, Menu } from "lucide-react";
+import { User, LogOut, BookOpen, ShieldCheck, Menu, MessageCircle, PlayCircle, CreditCard } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -57,122 +57,198 @@ export function SiteHeader() {
               PI
             </div>
           )}
-
           <span className="bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent tracking-tight">
             Padat Ilmu
           </span>
         </Link>
 
-        {/* DESKTOP NAVIGATION LINKS (Tampil di Laptop/Komputer) */}
+        {/* DESKTOP NAVIGATION LINKS */}
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
           <Link to="/" className="transition-colors hover:text-foreground/80 text-foreground/60">
             Beranda
           </Link>
           <Link to="/kelas" className="transition-colors hover:text-foreground/80 text-foreground/60">
-            Katalog Kelas
+            Daftar Kelas
           </Link>
         </nav>
 
-        {/* USER PROFILE & MOBILE HAMBURGER MENU */}
+        {/* DESKTOP USER PROFILE & MOBILE HAMBURGER */}
         <div className="flex items-center gap-2">
           
-          {/* USER PROFILE DROPDOWN (Jika sudah login) */}
-          {user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-9 w-9 rounded-full bg-secondary">
-                  <User className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <div className="flex items-center justify-start gap-2 p-2">
-                  <div className="flex flex-col space-y-1 leading-none">
-                    <p className="font-medium text-sm">{profile?.full_name || user.email}</p>
-                    <p className="text-xs text-muted-foreground">{user.email}</p>
+          {/* USER PROFILE DROPDOWN (Hanya Muncul di Desktop/Laptop) */}
+          <div className="hidden md:block">
+            {user ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-9 w-9 rounded-full bg-secondary">
+                    <User className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <div className="flex items-center justify-start gap-2 p-2">
+                    <div className="flex flex-col space-y-1 leading-none">
+                      <p className="font-medium text-sm">{profile?.full_name || user.email}</p>
+                      <p className="text-xs text-muted-foreground">{user.email}</p>
+                    </div>
                   </div>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link to="/kelas-saya" className="cursor-pointer flex items-center gap-2">
-                    <BookOpen className="h-4 w-4" /> Kelas Saya
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link to="/profil" className="cursor-pointer flex items-center gap-2">
-                    <User className="h-4 w-4" /> Profil & Pengaturan
-                  </Link>
-                </DropdownMenuItem>
-                {isAdmin && (
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link to="/admin" className="cursor-pointer flex items-center gap-2">
-                      <ShieldCheck className="h-4 w-4" /> Panel Admin
+                    <Link to="/kelas-saya" className="cursor-pointer flex items-center gap-2">
+                      <BookOpen className="h-4 w-4" /> Kelas Saya
                     </Link>
                   </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer text-destructive focus:text-destructive flex items-center gap-2">
-                  <LogOut className="h-4 w-4" /> Keluar
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            /* Tombol Masuk/Daftar langsung hanya muncul di layar Laptop/Komputer */
-            <div className="hidden md:block">
+                  <DropdownMenuItem asChild>
+                    <Link to="/video" className="cursor-pointer flex items-center gap-2">
+                      <PlayCircle className="h-4 w-4" /> Riwayat Video
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/pembayaran" className="cursor-pointer flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" /> Riwayat Pembayaran
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/profil" className="cursor-pointer flex items-center gap-2">
+                      <User className="h-4 w-4" /> Profil
+                    </Link>
+                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem asChild>
+                      <Link to="/admin" className="cursor-pointer flex items-center gap-2 text-primary">
+                        <ShieldCheck className="h-4 w-4" /> Panel Admin
+                      </Link>
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => signOut()} className="cursor-pointer text-destructive focus:text-destructive flex items-center gap-2">
+                    <LogOut className="h-4 w-4" /> Keluar
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
               <Button asChild size="sm">
                 <Link to="/auth">Masuk / Daftar</Link>
               </Button>
-            </div>
-          )}
+            )}
+          </div>
 
-          {/* MENU GARIS TIGA (Hanya Muncul di Tampilan HP) */}
+          {/* MOBILE HAMBURGER MENU (Khusus Layar HP) */}
           <div className="md:hidden">
             <Sheet open={openMobileMenu} onOpenChange={setOpenMobileMenu}>
               <SheetTrigger asChild>
-                <Button variant="outline" size="icon" className="h-9 w-9">
-                  <Menu className="h-5 w-5" />
+                <Button variant="ghost" size="icon" className="h-10 w-10">
+                  <Menu className="h-6 w-6" />
                   <span className="sr-only">Buka Menu</span>
                 </Button>
               </SheetTrigger>
-              <SheetContent side="right" className="w-[280px] sm:w-[350px] p-6">
-                <SheetHeader className="text-left mb-6">
-                  <SheetTitle className="flex items-center gap-2 font-bold text-lg">
-                    {logoUrl ? (
-                      <img src={logoUrl} alt="Logo" className="h-7 w-auto object-contain" />
-                    ) : (
-                      <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary text-primary-foreground font-extrabold text-xs">
-                        PI
-                      </div>
-                    )}
-                    Padat Ilmu
+              <SheetContent side="right" className="w-[300px] sm:w-[350px] flex flex-col p-6">
+                
+                {/* HEADER MENU */}
+                <SheetHeader className="relative text-center pb-6 border-b-0">
+                  <SheetTitle className="text-primary text-xl font-semibold mt-2">
+                    Menu
                   </SheetTitle>
                 </SheetHeader>
 
-                <div className="flex flex-col space-y-4">
+                {/* LIST MENU */}
+                <div className="flex flex-col space-y-7 mt-4 flex-1 overflow-y-auto px-2">
                   <Link
                     to="/"
                     onClick={() => setOpenMobileMenu(false)}
-                    className="text-base font-medium transition-colors hover:text-primary py-2 border-b"
+                    className="text-[17px] font-normal text-foreground/90"
                   >
                     Beranda
                   </Link>
                   <Link
                     to="/kelas"
                     onClick={() => setOpenMobileMenu(false)}
-                    className="text-base font-medium transition-colors hover:text-primary py-2 border-b"
+                    className="text-[17px] font-normal text-foreground/90"
                   >
-                    Katalog Kelas
+                    Daftar Kelas
                   </Link>
 
-                  {!user && (
-                    <div className="pt-4">
-                      <Button asChild className="w-full">
-                        <Link to="/auth" onClick={() => setOpenMobileMenu(false)}>
-                          Masuk / Daftar
+                  {/* MENU USER (JIKA SUDAH LOGIN) */}
+                  {user && (
+                    <>
+                      <Link
+                        to="/kelas-saya"
+                        onClick={() => setOpenMobileMenu(false)}
+                        className="text-[17px] font-normal text-foreground/90"
+                      >
+                        Kelas Saya
+                      </Link>
+                      <Link
+                        to="/video"
+                        onClick={() => setOpenMobileMenu(false)}
+                        className="text-[17px] font-normal text-foreground/90"
+                      >
+                        Riwayat Video
+                      </Link>
+                      <Link
+                        to="/pembayaran"
+                        onClick={() => setOpenMobileMenu(false)}
+                        className="text-[17px] font-normal text-foreground/90"
+                      >
+                        Riwayat Pembayaran
+                      </Link>
+                      <Link
+                        to="/profil"
+                        onClick={() => setOpenMobileMenu(false)}
+                        className="text-[17px] font-normal text-foreground/90"
+                      >
+                        Profil
+                      </Link>
+                      
+                      {/* MENU ADMIN (JIKA ROLE ADMIN) */}
+                      {isAdmin && (
+                        <Link
+                          to="/admin"
+                          onClick={() => setOpenMobileMenu(false)}
+                          className="text-[17px] font-medium text-primary"
+                        >
+                          Panel Admin
                         </Link>
-                      </Button>
-                    </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* BANTUAN ADMIN */}
+                  <div className="pt-2">
+                    <a
+                      href="#"
+                      className="flex items-center gap-3 text-[17px] font-normal text-foreground/90"
+                    >
+                      <MessageCircle className="h-5 w-5 text-primary" />
+                      Bantuan Admin
+                    </a>
+                  </div>
+                </div>
+
+                {/* TOMBOL KELUAR / MASUK */}
+                <div className="mt-auto pt-6 pb-4">
+                  {user ? (
+                    <Button
+                      variant="outline"
+                      className="w-full rounded-full py-6 text-base font-medium border-muted-foreground/30 shadow-sm"
+                      onClick={() => {
+                        signOut();
+                        setOpenMobileMenu(false);
+                      }}
+                    >
+                      Keluar
+                    </Button>
+                  ) : (
+                    <Button
+                      className="w-full rounded-full py-6 text-base font-medium shadow-sm"
+                      asChild
+                    >
+                      <Link to="/auth" onClick={() => setOpenMobileMenu(false)}>
+                        Masuk / Daftar
+                      </Link>
+                    </Button>
                   )}
                 </div>
+
               </SheetContent>
             </Sheet>
           </div>
