@@ -1,194 +1,98 @@
+import { Link, useNavigate } from "@tanstack/react-router";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Menu, BookOpen, MessageCircle } from "lucide-react";
 import { useState } from "react";
-import { Link } from "@tanstack/react-router";
-import { useAuth } from "@/lib/auth";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { BookOpen, Menu, MessageCircle } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
+import { settingsQuery } from "@/lib/queries";
 
 export function SiteHeader() {
-  const { user, isAdmin, loading, signOut } = useAuth();
+  const { session, isAdmin } = useAuth();
+  const { data: settings } = useQuery(settingsQuery);
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+  const qc = useQueryClient();
 
-  // Query dinamis logo dari settings (jika ada)
-  const { data: logoUrl } = useQuery({
-    queryKey: ["site-logo"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("settings")
-        .select("value")
-        .eq("key", "logo_url")
-        .maybeSingle();
+  const siteName = settings?.site_name?.trim() || "PadatIlmu";
+  const logoUrl = settings?.logo_url || "";
 
-      if (error || !data) return null;
-      return data.value as string;
-    },
-    staleTime: 1000 * 60 * 30,
-  });
+  async function logout() {
+    setOpen(false);
+    await qc.cancelQueries();
+    qc.clear();
+    await supabase.auth.signOut();
+    navigate({ to: "/auth", replace: true });
+  }
 
-  const closeMenu = () => setOpen(false);
+  const item = "block rounded-xl px-4 py-3 text-base font-medium hover:bg-secondary";
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between px-4">
-        
-        {/* LOGO & NAMA BRAND */}
-        <Link to="/" className="flex items-center gap-2 font-bold text-xl">
+    <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur">
+      <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
+        <Link to="/" className="flex items-center gap-2.5">
           {logoUrl ? (
             <img
               src={logoUrl}
-              alt="Padat Ilmu Logo"
-              className="h-8 w-auto object-contain"
+              alt={siteName}
+              className="h-8 max-h-9 w-auto max-w-[140px] object-contain rounded"
             />
           ) : (
-            <BookOpen className="h-6 w-6 text-primary" />
+            <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground">
+              <BookOpen className="h-5 w-5" />
+            </span>
           )}
-          <span className="text-primary font-bold">Padat Ilmu</span>
+          <span className="font-display text-xl font-bold tracking-tight text-primary">
+            {siteName}
+          </span>
         </Link>
 
-        {/* DESKTOP NAVIGATION (Tampilan Laptop) */}
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
-          <Link to="/" className="hover:text-primary transition-colors">
-            Beranda
-          </Link>
-          <Link to="/kelas" className="hover:text-primary transition-colors">
-            Daftar Kelas
-          </Link>
-          {!loading && user && (
-            <>
-              <Link to="/kelas-saya" className="hover:text-primary transition-colors">
-                Kelas Saya
-              </Link>
-              <Link to="/video" className="hover:text-primary transition-colors">
-                Riwayat Video
-              </Link>
-              <Link to="/pembayaran" className="hover:text-primary transition-colors">
-                Riwayat Pembayaran
-              </Link>
-              <Link to="/profil" className="hover:text-primary transition-colors">
-                Profil
-              </Link>
-              {isAdmin && (
-                <Link to="/admin" className="text-primary font-semibold hover:underline">
-                  Panel Admin
-                </Link>
-              )}
-            </>
-          )}
-        </nav>
-
-        {/* DESKTOP BUTTON */}
-        <div className="hidden md:flex items-center gap-3">
-          {loading ? (
-            <div className="h-9 w-24 bg-muted animate-pulse rounded-md" />
-          ) : user ? (
-            <Button variant="outline" size="sm" onClick={() => signOut()}>
-              Keluar
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" aria-label="Menu">
+              <Menu className="h-6 w-6" />
             </Button>
-          ) : (
-            <Button asChild size="sm">
-              <Link to="/auth">Masuk / Daftar</Link>
-            </Button>
-          )}
-        </div>
-
-        {/* MOBILE HAMBURGER MENU (Tampilan HP) */}
-        <div className="md:hidden">
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-9 w-9">
-                <Menu className="h-6 w-6" />
-                <span className="sr-only">Toggle Menu</span>
-              </Button>
-            </SheetTrigger>
-
-            <SheetContent side="right" className="w-[300px] sm:w-[350px] flex flex-col justify-between p-6">
-              <div>
-                <SheetHeader className="text-center pb-4 border-b">
-                  <SheetTitle className="text-xl font-semibold text-primary text-center">
-                    Menu
-                  </SheetTitle>
-                </SheetHeader>
-
-                <div className="flex flex-col space-y-4 py-6 text-base font-medium">
-                  <Link to="/" onClick={closeMenu} className="hover:text-primary transition-colors">
-                    Beranda
-                  </Link>
-                  <Link to="/kelas" onClick={closeMenu} className="hover:text-primary transition-colors">
-                    Daftar Kelas
-                  </Link>
-
-                  {/* HANYA MUNCUL JIKA USER SUDAH LOGIN & LOADING SELESAI */}
-                  {!loading && user && (
-                    <>
-                      <Link to="/kelas-saya" onClick={closeMenu} className="hover:text-primary transition-colors">
-                        Kelas Saya
-                      </Link>
-                      <Link to="/video" onClick={closeMenu} className="hover:text-primary transition-colors">
-                        Riwayat Video
-                      </Link>
-                      <Link to="/pembayaran" onClick={closeMenu} className="hover:text-primary transition-colors">
-                        Riwayat Pembayaran
-                      </Link>
-                      <Link to="/profil" onClick={closeMenu} className="hover:text-primary transition-colors">
-                        Profil
-                      </Link>
-                      {isAdmin && (
-                        <Link to="/admin" onClick={closeMenu} className="text-primary font-semibold">
-                          Panel Admin
-                        </Link>
-                      )}
-                    </>
-                  )}
-
-                  <a
-                    href="#"
-                    onClick={closeMenu}
-                    className="flex items-center gap-2 pt-2 hover:text-primary transition-colors"
-                  >
-                    <MessageCircle className="h-5 w-5 text-primary" />
-                    Bantuan Admin
-                  </a>
-                </div>
-              </div>
-
-              {/* TOMBOL AKSI DI PALING BAWAH MENU */}
-              <div className="pb-4">
-                {loading ? (
-                  <div className="h-12 w-full bg-muted animate-pulse rounded-full" />
-                ) : user ? (
-                  <Button
-                    variant="outline"
-                    className="w-full rounded-full py-5 text-base"
-                    onClick={() => {
-                      signOut();
-                      closeMenu();
-                    }}
-                  >
-                    Keluar
-                  </Button>
-                ) : (
-                  <Button
-                    className="w-full rounded-full py-5 text-base"
-                    asChild
-                  >
-                    <Link to="/auth" onClick={closeMenu}>
-                      Masuk / Daftar
-                    </Link>
-                  </Button>
+          </SheetTrigger>
+          <SheetContent side="right" className="w-72">
+            <SheetHeader>
+              <SheetTitle className="font-display text-primary flex items-center gap-2">
+                {logoUrl && (
+                  <img src={logoUrl} alt={siteName} className="h-6 w-auto object-contain rounded" />
                 )}
-              </div>
-            </SheetContent>
-          </Sheet>
-        </div>
-
+                {siteName}
+              </SheetTitle>
+            </SheetHeader>
+            <nav className="mt-4 space-y-1" onClick={() => setOpen(false)}>
+              <Link to="/" className={item}>Beranda</Link>
+              <Link to="/kelas" className={item}>Daftar Kelas</Link>
+              {session ? (
+                <>
+                  <Link to="/kelas-saya" className={item}>Kelas Saya</Link>
+                  <Link to="/video" className={item}>Riwayat Video</Link>
+                  <Link to="/pembayaran" className={item}>Riwayat Pembayaran</Link>
+                  <Link to="/profil" className={item}>Profil</Link>
+                  {isAdmin && <Link to="/admin" className={`${item} text-primary font-semibold`}>Panel Admin</Link>}
+                </>
+              ) : (
+                <Link to="/auth" className={item}>Masuk / Daftar</Link>
+              )}
+              <a
+                href={settings?.admin_whatsapp ? `https://wa.me/${settings.admin_whatsapp}` : "https://wa.me/62881022392900"}
+                target="_blank"
+                rel="noreferrer"
+                className={`${item} flex items-center gap-2`}
+              >
+                <MessageCircle className="h-5 w-5 text-primary" /> Bantuan Admin
+              </a>
+            </nav>
+            {session && (
+              <Button variant="outline" className="mt-6 w-full" onClick={logout}>
+                Keluar
+              </Button>
+            )}
+          </SheetContent>
+        </Sheet>
       </div>
     </header>
   );
