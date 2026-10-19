@@ -9,6 +9,8 @@ import { Label } from "@/components/ui/label";
 export const Route = createFileRoute("/reset-password")({
   head: () => ({
     meta: [
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: "Atur Password Baru — Bimbelajar" },
       { name: "description", content: "Buat password baru untuk akun Bimbelajar Anda." },
       { property: "og:title", content: "Atur Password Baru — Bimbelajar" },

@@ -6,6 +6,8 @@ import hero from "@/assets/hero.jpg";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: "Bimbelajar — Les Ngaji Online dari Nol untuk Dewasa & Ibu-ibu" },
       { name: "description", content: "Belajar membaca Al-Qur'an dari nol, tanpa malu, dibimbing guru yang sabar, langsung dari rumah." },
       { property: "og:title", content: "Bimbelajar — Les Ngaji Online untuk Dewasa" },

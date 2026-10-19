@@ -13,6 +13,8 @@ export const Route = createFileRoute("/ilmu/$slug")({
   },
   head: ({ loaderData }) => ({
     meta: [
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: loaderData ? `${loaderData.name} — Bimbelajar` : "Ilmu — Bimbelajar" },
       { name: "description", content: loaderData?.bio ?? "Pilih kelas dan level." },
       { property: "og:title", content: loaderData ? `${loaderData.name} — Bimbelajar` : "Ilmu — Bimbelajar" },

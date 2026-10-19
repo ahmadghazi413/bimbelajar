@@ -15,6 +15,8 @@ export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>): { redirect?: string } => (typeof s["redirect"] === "string" ? { redirect: s["redirect"] } : {}),
   head: () => ({
     meta: [
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: "Masuk atau Daftar — Bimbelajar" },
       { name: "description", content: "Masuk atau buat akun Bimbelajar untuk mulai belajar ngaji online." },
       { property: "og:title", content: "Masuk atau Daftar — Bimbelajar" },

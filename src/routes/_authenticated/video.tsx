@@ -8,7 +8,7 @@ import { Page } from "@/components/PageTitle";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/video")({
-  head: () => ({ meta: [{ title: "Riwayat Video — Bimbelajar" }] }),
+  head: () => ({ meta: [{ title: "Riwayat Video — Bimbelajar" }, { name: "description", content: "Rekaman kelas ngaji untuk murid Bimbelajar yang sudah lunas." }, { property: "og:title", content: "Riwayat Video — Bimbelajar" }, { property: "og:description", content: "Rekaman kelas ngaji untuk murid Bimbelajar yang sudah lunas." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
   component: VideoPage,
 });
 

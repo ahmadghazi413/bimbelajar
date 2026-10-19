@@ -11,9 +11,11 @@ import { SessionList } from "@/components/SessionList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { discountQuote, referralBalanceQuery } from "@/lib/referral";
 
 export const Route = createFileRoute("/_authenticated/bayar/$slug")({
-  head: () => ({ meta: [{ title: "Pembayaran Kelas — Bimbelajar" }] }),
+  head: () => ({ meta: [{ title: "Pembayaran Kelas — Bimbelajar" }, { name: "description", content: "Daftar kelas Bimbelajar dengan kode teman, voucher dan pembayaran transfer." }, { property: "og:title", content: "Pembayaran Kelas — Bimbelajar" }, { property: "og:description", content: "Daftar kelas Bimbelajar dengan kode teman, voucher dan pembayaran transfer." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
   component: Bayar,
 });
 
@@ -32,21 +34,33 @@ function Bayar() {
   const { data: qris } = useQuery({
     queryKey: ["qris", settings?.["qris_image_url"]],
     enabled: !!settings,
-    queryFn: () => qrisUrl(settings!["qris_image_url"] ?? ""),
+    queryFn: () => qrisUrl(settings?.["qris_image_url"] ?? ""),
   });
   const enr = useQuery({
     queryKey: ["my-enrollment", slug],
     enabled: !!c,
     queryFn: async () => {
-      const { data } = await supabase.from("enrollments").select("*").eq("class_id", c!.id).eq("user_id", userId)
+      if (!c) return null;
+      const { data, error } = await supabase.from("enrollments").select("*").eq("class_id", c.id).eq("user_id", userId)
         .order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (error) throw error;
       return data;
     },
   });
   const [sender, setSender] = useState("");
   const [busy, setBusy] = useState(false);
   const [voucher, setVoucher] = useState("");
-  const [applied, setApplied] = useState<{ code: string; discount: number; final: number } | null>(null);
+  const [applied, setApplied] = useState<{ code: string; kind: string } | null>(null);
+  const [useReward, setUseReward] = useState(false);
+  const balance = useQuery(referralBalanceQuery(userId));
+  const quote = useQuery({
+    queryKey: ["discount-quote", c?.id, applied?.code, useReward, userId],
+    enabled: !!c,
+    queryFn: async () => {
+      if (!c) throw new Error("Kelas tidak tersedia.");
+      return discountQuote(c.id, applied?.code ?? "", useReward);
+    },
+  });
 
   if (!c) return <Page title="Memuat...">{null}</Page>;
   const e = enr.data;
@@ -56,29 +70,35 @@ function Bayar() {
     number: settings?.["bank_number"] || "1234567890",
     holder: settings?.["bank_holder"] || "Yayasan Bimbelajar",
   };
-  const finalPrice = applied ? applied.final : c.price;
+  const finalPrice = quote.data?.final_amount ?? c.price;
 
   async function terapkanVoucher() {
-    if (!voucher.trim()) return;
+    if (!voucher.trim() || !c) return;
     setBusy(true);
-    const { data, error } = await supabase.rpc("validate_voucher", { _code: voucher.trim(), _price: c!.price });
-    setBusy(false);
-    const row = data?.[0];
-    if (error || !row) { toast.error("Kode voucher tidak valid atau sudah habis."); setApplied(null); return; }
-    setApplied({ code: row.voucher_code, discount: row.discount, final: row.final_amount });
-    toast.success(`Voucher ${row.voucher_code} dipakai. Diskon ${rupiah(row.discount)}.`);
+    try {
+      const row = await discountQuote(c.id, voucher, useReward);
+      setApplied({ code: row.code, kind: row.kind });
+      toast.success(`Kode diterapkan. Diskon ${rupiah(row.discount)}.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String((error as { message?: string }).message ?? "Kode tidak valid."));
+      setApplied(null);
+    } finally { setBusy(false); }
   }
 
   async function daftar() {
+    if (!c || !quote.data || quote.error || (voucher.trim() && !applied)) return;
     setBusy(true);
     const { error } = await supabase.from("enrollments").insert({
-      user_id: userId, class_id: c!.id, amount: finalPrice, method: `Transfer ${bank.bank}`, sender_name: sender,
-      voucher_code: applied?.code ?? null,
+      user_id: userId, class_id: c.id, amount: finalPrice, method: `Transfer ${bank.bank}`, sender_name: sender.trim(),
+      voucher_code: applied?.kind === "voucher" ? applied.code : null,
+      referral_code: applied?.kind === "referral" ? applied.code : null,
+      use_referral_reward: useReward,
     });
     setBusy(false);
     if (error) { toast.error("Gagal mendaftar: " + error.message); return; }
     toast.success("Pendaftaran tercatat. Silakan transfer.");
     qc.invalidateQueries({ queryKey: ["my-enrollment", slug] });
+    qc.invalidateQueries({ queryKey: ["referral-balance", userId] });
   }
 
   async function uploadProof(file: File) {
@@ -96,7 +116,7 @@ function Bayar() {
 
   return (
     <Page title={`Daftar ${c.name} — Level ${c.level_number} ${c.level_label}`} subtitle={`${c.price_prefix} ${rupiah(c.price)} / bulan`}>
-      {e && e.status !== "rejected" ? (
+      {enr.isPending ? <p>Memuat pendaftaran...</p> : enr.error ? <p className="text-destructive">Pendaftaran belum dapat dimuat. Silakan coba lagi.</p> : e && e.status !== "rejected" ? (
         <div className="space-y-4 rounded-3xl border bg-card p-6">
           <div className="flex items-center justify-between"><span className="font-semibold">Status</span><StatusBadge status={e.status} /></div>
           {e.status === "paid" ? (
@@ -116,21 +136,26 @@ function Bayar() {
         <div className="space-y-4 rounded-3xl border bg-card p-6">
           {e?.status === "rejected" && <p className="text-destructive">Pembayaran sebelumnya ditolak. Silakan daftar ulang.</p>}
           <div className="space-y-2">
-            <Label htmlFor="v">Punya kode voucher? (opsional)</Label>
+            <Label htmlFor="v">Kode teman / voucher (opsional)</Label>
             <div className="flex gap-2">
               <Input id="v" value={voucher} onChange={(ev) => { setVoucher(ev.target.value); setApplied(null); }} className="h-12" placeholder="Contoh: AJAKTEMAN" />
               <Button variant="outline" className="h-12" disabled={busy || !voucher.trim()} onClick={terapkanVoucher}>Terapkan</Button>
             </div>
             {applied && (
-              <p className="text-sm text-success">Diskon {rupiah(applied.discount)} — total bayar jadi <b>{rupiah(applied.final)}</b></p>
+              <p className="text-sm text-success">{applied.kind === "referral" ? "Kode teman" : "Voucher"} diterapkan · Diskon {rupiah(quote.data?.discount ?? 0)}</p>
             )}
           </div>
+          {(balance.data ?? 0) > 0 && <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3"><Label htmlFor="use-reward">Gunakan saldo bonus ({rupiah(balance.data ?? 0)})</Label><Switch id="use-reward" checked={useReward} onCheckedChange={setUseReward} /></div>
+            {useReward && <p className="text-sm text-success">Potongan bonus: {rupiah(quote.data?.reward_used ?? 0)}</p>}
+          </div>}
+          {quote.error && <p className="text-sm text-destructive">{quote.error.message}</p>}
           <TransferInfo amount={finalPrice} qris={qris ?? ""} bank={bank} />
           <div className="space-y-2">
             <Label htmlFor="s">Nama pemilik rekening pengirim</Label>
             <Input id="s" value={sender} onChange={(ev) => setSender(ev.target.value)} className="h-12" placeholder="Contoh: Siti Aminah" />
           </div>
-          <Button variant="hero" size="lg" className="w-full" disabled={busy || !sender} onClick={daftar}>Saya Sudah / Akan Transfer</Button>
+          <Button variant="hero" size="lg" className="w-full" disabled={busy || !sender.trim() || quote.isFetching || !!quote.error || !quote.data || (!!voucher.trim() && !applied)} onClick={daftar}>Saya Sudah / Akan Transfer</Button>
         </div>
       )}
       {wa && (

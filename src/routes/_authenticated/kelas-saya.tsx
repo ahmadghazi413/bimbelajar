@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { SessionList } from "@/components/SessionList";
 
 export const Route = createFileRoute("/_authenticated/kelas-saya")({
-  head: () => ({ meta: [{ title: "Kelas Saya — Bimbelajar" }] }),
+  head: () => ({ meta: [{ title: "Kelas Saya — Bimbelajar" }, { name: "description", content: "Kelas ngaji yang Anda ikuti, jadwal dan akses belajar Bimbelajar." }, { property: "og:title", content: "Kelas Saya — Bimbelajar" }, { property: "og:description", content: "Kelas ngaji yang Anda ikuti, jadwal dan akses belajar Bimbelajar." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
   component: KelasSaya,
 });
 

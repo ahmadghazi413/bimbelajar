@@ -6,6 +6,8 @@ import { subjectsQuery } from "@/lib/queries";
 export const Route = createFileRoute("/kelas/")({
   head: () => ({
     meta: [
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: "Pilih Ilmu & Kelas — Bimbelajar" },
       { name: "description", content: "Pilih ilmu yang ingin dipelajari, lalu pilih kelas dan level yang sesuai." },
       { property: "og:title", content: "Pilih Ilmu & Kelas — Bimbelajar" },

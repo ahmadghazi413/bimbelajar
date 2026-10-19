@@ -8,9 +8,10 @@ import { Page } from "@/components/PageTitle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ReferralPanel } from "@/components/ReferralPanel";
 
 export const Route = createFileRoute("/_authenticated/profil")({
-  head: () => ({ meta: [{ title: "Profil — Bimbelajar" }] }),
+  head: () => ({ meta: [{ title: "Profil — Bimbelajar" }, { name: "description", content: "Profil, kode ajak teman dan saldo bonus Bimbelajar." }, { property: "og:title", content: "Profil — Bimbelajar" }, { property: "og:description", content: "Profil, kode ajak teman dan saldo bonus Bimbelajar." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
   component: Profil,
 });
 
@@ -39,6 +40,7 @@ function Profil() {
         <div className="space-y-2"><Label htmlFor="p">No. WhatsApp</Label><Input id="p" value={phone} onChange={(e) => setPhone(e.target.value)} className="h-12" placeholder="08xxxxxxxxxx" /></div>
         <Button type="submit" variant="hero" className="w-full">Simpan</Button>
       </form>
+      <ReferralPanel userId={userId} />
       <div className="mt-6 rounded-3xl bg-secondary p-6 text-secondary-foreground">
         <h2 className="text-xl font-semibold">Progres belajar</h2>
         <p className="mt-2">Level saat ini: <b>{data?.current_level ? `Level ${data.current_level}` : "Belum dinilai"}</b></p>
