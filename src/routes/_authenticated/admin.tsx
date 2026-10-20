@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ReferralSettings } from "@/components/ReferralSettings";
@@ -107,70 +106,44 @@ function Dashboard() {
     { label: "Pemasukan bulan ini", value: data ? rupiah(data.pemasukan) : "-" },
     { label: "Menunggu konfirmasi", value: data?.pending ?? "-" },
   ];
-  function KelolaKelas() {
+  return (
+    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      {cards.map((c) => (
+        <div key={c.label} className="rounded-2xl border bg-card p-5">
+          <p className="text-sm text-muted-foreground">{c.label}</p>
+          <p className="mt-1 font-display text-3xl font-semibold text-primary">{c.value}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+type ClassForm = Partial<Tables<"classes">> & { whatsapp_link?: string; zoom_link?: string };
+
+function KelolaKelas() {
   const { data } = useClasses();
   const qc = useQueryClient();
   const [edit, setEdit] = useState<ClassForm | null>(null);
-  const [selected, setSelected] = useState<string[]>([]);
-
-  const allIds = data?.map((c) => c.id) ?? [];
-  const isAllSelected = allIds.length > 0 && selected.length === allIds.length;
-
-  const toggleSelectAll = () => {
-    if (isAllSelected) {
-      setSelected([]);
-    } else {
-      setSelected(allIds);
-    }
-  };
-
-  const toggleSelect = (id: string) => {
-    setSelected((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  };
 
   async function save() {
     if (!edit) return;
-    if (!edit.name?.trim() || !edit.subject_id) {
-      toast.error("Nama kelas dan ilmu wajib diisi.");
-      return;
-    }
+    if (!edit.name?.trim() || !edit.subject_id) { toast.error("Nama kelas dan ilmu wajib diisi."); return; }
     const { whatsapp_link = "", zoom_link = "", ...rest } = edit;
     const payload = {
       slug: rest.slug || (rest.name ?? "kelas").toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-      name: rest.name ?? "",
-      tagline: rest.tagline ?? "",
-      description: rest.description ?? "",
-      goals: rest.goals ?? "",
-      levels_label: rest.levels_label ?? "Level 1–2",
-      schedule: rest.schedule ?? "",
-      quota: Number(rest.quota ?? 10),
-      price: Number(rest.price ?? 0),
-      price_prefix: rest.price_prefix ?? "",
-      is_active: rest.is_active ?? true,
-      sort_order: rest.sort_order ?? 99,
-      subject_id: edit.subject_id,
-      level_number: Number(rest.level_number ?? 1),
-      level_label: rest.level_label ?? "Baru Belajar",
+      name: rest.name ?? "", tagline: rest.tagline ?? "", description: rest.description ?? "", goals: rest.goals ?? "",
+      levels_label: rest.levels_label ?? "Level 1–2", schedule: rest.schedule ?? "", quota: Number(rest.quota ?? 10),
+      price: Number(rest.price ?? 0), price_prefix: rest.price_prefix ?? "", is_active: rest.is_active ?? true,
+      sort_order: rest.sort_order ?? 99, subject_id: edit.subject_id,
+      level_number: Number(rest.level_number ?? 1), level_label: rest.level_label ?? "Baru Belajar",
       advantages: rest.advantages ?? "",
     };
     const res = rest.id
       ? await supabase.from("classes").update(payload).eq("id", rest.id).select().single()
       : await supabase.from("classes").insert(payload).select().single();
-    if (res.error) {
-      toast.error(res.error.message);
-      return;
-    }
-    const { error } = await supabase.from("class_private").upsert({
-      class_id: res.data.id,
-      whatsapp_link,
-      zoom_link,
-    });
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
+    if (res.error) { toast.error(res.error.message); return; }
+    const { error } = await supabase.from("class_private").upsert({ class_id: res.data.id, whatsapp_link, zoom_link });
+    if (error) { toast.error(error.message); return; }
     toast.success("Kelas disimpan.");
     setEdit(null);
     qc.invalidateQueries();
@@ -180,164 +153,50 @@ function Dashboard() {
     <div className="space-y-1">
       <Label>{label}</Label>
       {type === "area" ? (
-        <Textarea
-          value={String(edit?.[k] ?? "")}
-          onChange={(e) => setEdit({ ...edit, [k]: e.target.value })}
-        />
+        <Textarea value={String(edit?.[k] ?? "")} onChange={(e) => setEdit({ ...edit, [k]: e.target.value })} />
       ) : (
-        <Input
-          type={type}
-          value={String(edit?.[k] ?? "")}
-          onChange={(e) => setEdit({ ...edit, [k]: e.target.value })}
-        />
+        <Input type={type} value={String(edit?.[k] ?? "")} onChange={(e) => setEdit({ ...edit, [k]: e.target.value })} />
       )}
     </div>
   );
 
   return (
     <div className="mt-4 space-y-3">
-      {/* Tombol Aksi Atas */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Button
-          onClick={() =>
-            setEdit({ is_active: true, level_number: 1, level_label: "Baru Belajar" })
-          }
-        >
-          + Tambah kelas
-        </Button>
-
-        {/* Tombol Hapus Sekaligus (muncul jika ada yang dicentang) */}
-        {selected.length > 0 && (
-          <AdminDelete
-            name={`${selected.length} kelas`}
-            description={`Anda yakin ingin menghapus ${selected.length} kelas terpilih sekaligus? Sesi dan rekaman kelas tersebut ikut terhapus. Kelas yang sudah memiliki pendaftar tidak akan dihapus.`}
-            onDelete={async () => {
-              const { error } = await supabase.from("classes").delete().in("id", selected);
-              if (error) throw new Error(error.message);
-              setSelected([]);
-              await qc.invalidateQueries();
-              toast.success(`${selected.length} kelas berhasil dihapus.`);
-            }}
-          />
-        )}
-      </div>
-
-      {/* Baris Centang Semua */}
-      {data && data.length > 0 && (
-        <div className="flex items-center gap-2 px-2 py-1 text-sm text-muted-foreground">
-          <Checkbox
-            id="select-all"
-            checked={isAllSelected}
-            onCheckedChange={toggleSelectAll}
-          />
-          <label htmlFor="select-all" className="cursor-pointer">
-            Pilih semua ({selected.length}/{data.length} terpilih)
-          </label>
-        </div>
-      )}
-
-      {/* Daftar Kelas dengan Checkbox */}
-      {data?.map((c) => {
-        const isChecked = selected.includes(c.id);
-        return (
-          <div
-            key={c.id}
-            className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4 transition-colors ${
-              isChecked ? "border-primary/50 bg-primary/5" : ""
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <Checkbox
-                id={`check-${c.id}`}
-                checked={isChecked}
-                onCheckedChange={() => toggleSelect(c.id)}
-              />
-              <label htmlFor={`check-${c.id}`} className="cursor-pointer">
-                <p className="font-semibold">
-                  {classLevelName(c)}{" "}
-                  {!c.is_active && (
-                    <span className="text-xs text-muted-foreground">(nonaktif)</span>
-                  )}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {c.price_prefix} {rupiah(c.price)} · kuota {c.quota}
-                </p>
-              </label>
-            </div>
-
-            <div className="flex shrink-0 items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setEdit({
-                    ...c,
-                    whatsapp_link: c.class_private?.whatsapp_link ?? "",
-                    zoom_link: c.class_private?.zoom_link ?? "",
-                  })
-                }
-              >
-                Ubah
-              </Button>
-              <AdminDelete
-                name={classLevelName(c)}
-                description="Sesi dan rekaman kelas ini ikut dihapus. Kelas yang memiliki pendaftar tidak dapat dihapus; nonaktifkan kelas untuk menyimpan riwayat pembayaran."
-                onDelete={async () => {
-                  const { error } = await supabase.from("classes").delete().eq("id", c.id);
-                  if (error) throw new Error(error.message);
-                  setSelected((prev) => prev.filter((id) => id !== c.id));
-                  await qc.invalidateQueries();
-                }}
-              />
-            </div>
+      <Button onClick={() => setEdit({ is_active: true, level_number: 1, level_label: "Baru Belajar" })}>+ Tambah kelas</Button>
+      {data?.map((c) => (
+        <div key={c.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4">
+          <div>
+            <p className="font-semibold">{classLevelName(c)} {!c.is_active && <span className="text-xs text-muted-foreground">(nonaktif)</span>}</p>
+            <p className="text-sm text-muted-foreground">{c.price_prefix} {rupiah(c.price)} · kuota {c.quota}</p>
           </div>
-        );
-      })}
-
-      {/* Modal Dialog Form Tambah/Ubah Kelas */}
+          <div className="flex shrink-0 items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setEdit({ ...c, whatsapp_link: c.class_private?.whatsapp_link ?? "", zoom_link: c.class_private?.zoom_link ?? "" })}>Ubah</Button>
+            <AdminDelete name={classLevelName(c)} description="Sesi dan rekaman kelas ini ikut dihapus. Kelas yang memiliki pendaftar tidak dapat dihapus; nonaktifkan kelas untuk menyimpan riwayat pembayaran." onDelete={async () => {
+              const { error } = await supabase.from("classes").delete().eq("id", c.id);
+              if (error) throw new Error(error.message);
+              await qc.invalidateQueries();
+            }} />
+          </div>
+        </div>
+      ))}
       <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{edit?.id ? "Ubah kelas" : "Kelas baru"}</DialogTitle>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>{edit?.id ? "Ubah kelas" : "Kelas baru"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <SubjectPicker
-              value={edit?.subject_id ?? ""}
-              onChange={(v) =>
-                setEdit((current) => (current ? { ...current, subject_id: v } : null))
-              }
-            />
-            {f("name", "Nama kelas")}
-            {f("tagline", "Tagline")}
-            {f("description", "Deskripsi", "area")}
-            {f("goals", "Tujuan", "area")}
+            <SubjectPicker value={edit?.subject_id ?? ""} onChange={(v) => setEdit((current) => current ? { ...current, subject_id: v } : null)} />
+            {f("name", "Nama kelas")}{f("tagline", "Tagline")}{f("description", "Deskripsi", "area")}{f("goals", "Tujuan", "area")}
             {f("advantages", "Keunggulan", "area")}
-            {f("level_number", "Nomor level", "number")}
-            {f("level_label", "Nama level")}
-            {f("levels_label", "Level")}
-            {f("schedule", "Jadwal")}
-            {f("quota", "Kuota", "number")}
-            {f("price_prefix", "Awalan harga (mis. Mulai)")}
-            {f("price", "Harga per bulan (Rp)", "number")}
-            {f("whatsapp_link", "Link grup WhatsApp")}
-            {f("zoom_link", "Link Zoom")}
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={edit?.is_active ?? true}
-                onCheckedChange={(v) => setEdit({ ...edit, is_active: v })}
-              />
-              <Label>Tampilkan ke publik</Label>
-            </div>
-            <Button className="w-full" onClick={save}>
-              Simpan
-            </Button>
+            {f("level_number", "Nomor level", "number")}{f("level_label", "Nama level")}
+            {f("levels_label", "Level")}{f("schedule", "Jadwal")}{f("quota", "Kuota", "number")}
+            {f("price_prefix", "Awalan harga (mis. Mulai)")}{f("price", "Harga per bulan (Rp)", "number")}
+            {f("whatsapp_link", "Link grup WhatsApp")}{f("zoom_link", "Link Zoom")}
+            <div className="flex items-center gap-2"><Switch checked={edit?.is_active ?? true} onCheckedChange={(v) => setEdit({ ...edit, is_active: v })} /><Label>Tampilkan ke publik</Label></div>
+            <Button className="w-full" onClick={save}>Simpan</Button>
           </div>
         </DialogContent>
       </Dialog>
     </div>
   );
-}
-
 }
 
 function ClassPicker({ value, onChange, subjectId }: { value: string; onChange: (v: string) => void; subjectId?: string }) {
