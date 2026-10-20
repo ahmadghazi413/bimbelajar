@@ -11,8 +11,8 @@ describe.skipIf(!url || !key)("Session publication and deletion", () => {
     const minted = JSON.parse(readFileSync(`${homedir()}/.cache/lovable-auth/session.json`, "utf8"));
     const admin = createClient(url, key, { auth: { persistSession: false }, global: { headers: { Authorization: `Bearer ${minted.session.access_token}` } } });
     const anon = createClient(url, key, { auth: { persistSession: false } });
-    const check = <T,>(result: { data: T; error: { message: string } | null }) => {
-      if (result.error) throw new Error(result.error.message);
+        const check = <T,>(result: { data: T | null; error: { message: string } | null }): T => {
+      if (result.error || result.data === null) throw new Error(result.error?.message ?? "missing data");
       return result.data;
     };
     let subjectId = "";
