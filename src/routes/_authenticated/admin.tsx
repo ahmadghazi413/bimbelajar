@@ -217,7 +217,7 @@ function KelolaSesi() {
   const [subjectId, setSubjectId] = useState("");
   const [classId, setClassId] = useState("");
   const qc = useQueryClient();
-  const { data } = useQuery({
+  const { data, refetch } = useQuery({
     queryKey: ["admin-sesi", classId],
     enabled: !!classId,
     queryFn: async () => {
@@ -234,7 +234,8 @@ function KelolaSesi() {
     const number = last ? (last.number >= 16 ? 1 : last.number + 1) : 1;
     const { error } = await supabase.from("class_sessions").insert({ class_id: classId, level, number, title: "Sesi baru", is_published: false });
     if (error) { toast.error(error.message); return; }
-    qc.invalidateQueries({ queryKey: ["admin-sesi", classId] });
+    await refetch();
+    qc.invalidateQueries();
   }
 
   return (
@@ -242,13 +243,13 @@ function KelolaSesi() {
       <SubjectPicker value={subjectId} onChange={(v) => { setSubjectId(v); setClassId(""); }} />
       <ClassPicker value={classId} onChange={setClassId} subjectId={subjectId} />
       {classId && data?.length === 0 && <p className="text-muted-foreground">Belum ada sesi.</p>}
-      {data?.map((s) => <SessionRow key={s.id} s={s} classId={classId} />)}
+      {data?.map((s) => <SessionRow key={s.id} s={s} classId={classId} onSaved={async () => { await refetch(); }} />)}
       {classId && <Button variant="outline" onClick={addSession}>+ Tambah sesi</Button>}
     </div>
   );
 }
 
-function SessionRow({ s, classId }: { s: Tables<"class_sessions"> & { video_url: string }; classId: string }) {
+function SessionRow({ s, classId, onSaved }: { s: Tables<"class_sessions"> & { video_url: string }; classId: string; onSaved: () => Promise<void> }) {
   const [v, setV] = useState(s);
   const qc = useQueryClient();
   async function save() {
@@ -261,6 +262,7 @@ function SessionRow({ s, classId }: { s: Tables<"class_sessions"> & { video_url:
     const published = await supabase.from("class_sessions").update({ is_published: v.is_published }).eq("id", s.id);
     if (published.error) { toast.error(published.error.message); return; }
     toast.success(v.is_published ? `Sesi ${v.number} diterbitkan.` : `Sesi ${v.number} disimpan sebagai draf.`);
+    await onSaved();
     qc.invalidateQueries();
   }
   return (
@@ -281,6 +283,7 @@ function SessionRow({ s, classId }: { s: Tables<"class_sessions"> & { video_url:
           <AdminDelete name={`sesi ${s.number}`} description="Sesi dan link rekamannya akan dihapus permanen." onDelete={async () => {
             const { error } = await supabase.from("class_sessions").delete().eq("id", s.id);
             if (error) throw new Error(error.message);
+            await onSaved();
             await qc.invalidateQueries();
           }} />
         </div>
