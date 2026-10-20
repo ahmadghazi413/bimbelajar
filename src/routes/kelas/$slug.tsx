@@ -4,7 +4,6 @@ import { CalendarDays, Target, Users } from "lucide-react";
 import { classDetailQuery } from "@/lib/queries";
 import { rupiah } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { SessionList } from "@/components/SessionList";
 
 export const Route = createFileRoute("/kelas/$slug")({
   loader: async ({ context, params }) => {
@@ -52,8 +51,10 @@ function Detail() {
       <h2 className="mt-6 flex items-center gap-2 text-2xl font-semibold"><Target className="h-6 w-6 text-primary" /> Tujuan</h2>
       <p className="mt-2 leading-relaxed">{c.goals}</p>
 
-      <h2 className="mb-4 mt-8 text-2xl font-semibold">Daftar Sesi</h2>
-      <SessionList sessions={c.class_sessions} />
+      {c.advantages.trim() && <>
+        <h2 className="mb-4 mt-8 text-2xl font-semibold">Keunggulan</h2>
+        <p className="whitespace-pre-line leading-relaxed">{c.advantages}</p>
+      </>}
 
       <div className="fixed inset-x-0 bottom-0 border-t bg-background/95 p-4 backdrop-blur">
         <div className="mx-auto max-w-3xl">
