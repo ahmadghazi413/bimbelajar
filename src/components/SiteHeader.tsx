@@ -31,21 +31,23 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
-        <Link to="/" className="flex items-center gap-2.5">
-          {logoUrl ? (
-            <img
-              src={logoUrl}
-              alt={siteName}
-              className="h-8 max-h-9 w-auto max-w-[140px] object-contain rounded"
-            />
-          ) : (
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground">
-              <BookOpen className="h-5 w-5" />
-            </span>
-          )}
-          <span className="font-display text-xl font-bold tracking-tight text-primary">
-            {siteName}
-          </span>
+<Link to="/" className="flex items-center gap-2.5">
+  {logoUrl ? (
+    <img
+      src={logoUrl}
+      alt={siteName}
+      className="h-8 max-h-9 w-auto max-w-[140px] object-contain rounded"
+    />
+  ) : (
+    <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground">
+      <BookOpen className="h-5 w-5" />
+    </span>
+  )}
+  <span className="font-display text-xl font-bold tracking-tight text-primary">
+    {siteName}
+  </span>
+</Link>
+
         </Link>
 
         <Sheet open={open} onOpenChange={setOpen}>
