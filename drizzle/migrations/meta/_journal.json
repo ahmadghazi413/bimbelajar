@@ -57,6 +57,13 @@
       "when": 1792368365948,
       "tag": "0007_referral_lookup_alias",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792463942411,
+      "tag": "0008_class_advantages_session_publication",
+      "breakpoints": true
     }
   ]
 }

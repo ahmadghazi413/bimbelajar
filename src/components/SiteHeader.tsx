@@ -48,8 +48,6 @@ export function SiteHeader() {
   </span>
 </Link>
 
-        </Link>
-
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" aria-label="Menu">
