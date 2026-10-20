@@ -43,7 +43,7 @@ export function SiteHeader() {
       <BookOpen className="h-5 w-5" />
     </span>
   )}
-  <span className="font-display text-xl font-bold tracking-tight text-primary">
+    <span className="font-display text-xl font-bold tracking-tight text-primary">
     {siteName}
   </span>
 </Link>
