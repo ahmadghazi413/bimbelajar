@@ -134,7 +134,7 @@ function KelolaKelas() {
       name: rest.name ?? "", tagline: rest.tagline ?? "", description: rest.description ?? "", goals: rest.goals ?? "",
       levels_label: rest.levels_label ?? "Level 1–2", schedule: rest.schedule ?? "", quota: Number(rest.quota ?? 10),
       price: Number(rest.price ?? 0), price_prefix: rest.price_prefix ?? "", is_active: rest.is_active ?? true,
-      sort_order: rest.sort_order ?? 99, subject_id: rest.subject_id,
+      sort_order: rest.sort_order ?? 99, subject_id: edit.subject_id,
       level_number: Number(rest.level_number ?? 1), level_label: rest.level_label ?? "Baru Belajar",
       advantages: rest.advantages ?? "",
     };
