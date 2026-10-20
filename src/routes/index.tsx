@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { BookOpen, Sparkles, CheckCircle2, Award, Users } from "lucide-react";
 
 export const Route = createFileRoute("/")({
+  head: () => ({ meta: [{ title: "Padat Ilmu — Bimbingan Belajar Online" }, { name: "description", content: "Pilih ilmu dan kelas daring di Padat Ilmu untuk belajar secara terstruktur." }, { property: "og:title", content: "Padat Ilmu — Bimbingan Belajar Online" }, { property: "og:description", content: "Pilih ilmu dan kelas daring di Padat Ilmu untuk belajar secara terstruktur." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
   component: IndexPage,
 });
 

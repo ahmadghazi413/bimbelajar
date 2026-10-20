@@ -1,0 +1,8 @@
+ALTER TABLE public.classes ADD COLUMN advantages text NOT NULL DEFAULT '';
+ALTER TABLE public.class_sessions ADD COLUMN is_published boolean NOT NULL DEFAULT true;
+ALTER POLICY "public read sessions" ON public.class_sessions USING (is_published OR public.has_role(auth.uid(), 'admin'));
+ALTER POLICY "paid read rec" ON public.session_recordings USING (public.has_role(auth.uid(), 'admin') OR (public.has_paid(auth.uid(), class_id) AND EXISTS (SELECT 1 FROM public.class_sessions s WHERE s.id = session_id AND s.is_published)));
+CREATE OR REPLACE FUNCTION public.guard_class_deletion() RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$ BEGIN IF EXISTS (SELECT 1 FROM public.enrollments e WHERE e.class_id = OLD.id) THEN RAISE EXCEPTION 'Kelas sudah memiliki pendaftar. Nonaktifkan kelas agar riwayat pembayaran tetap tersimpan.'; END IF; RETURN OLD; END $$;
+CREATE TRIGGER guard_class_deletion BEFORE DELETE ON public.classes FOR EACH ROW EXECUTE FUNCTION public.guard_class_deletion();
+CREATE OR REPLACE FUNCTION public.guard_subject_deletion() RETURNS trigger LANGUAGE plpgsql SET search_path = public AS $$ BEGIN IF EXISTS (SELECT 1 FROM public.classes c WHERE c.subject_id = OLD.id) THEN RAISE EXCEPTION 'Pindahkan atau hapus kelas di dalam ilmu ini terlebih dahulu.'; END IF; RETURN OLD; END $$;
+CREATE TRIGGER guard_subject_deletion BEFORE DELETE ON public.subjects FOR EACH ROW EXECUTE FUNCTION public.guard_subject_deletion();

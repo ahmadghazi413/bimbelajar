@@ -15,6 +15,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ReferralSettings } from "@/components/ReferralSettings";
+import { AdminDelete } from "@/components/AdminDelete";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+import { classesInSubject, classLevelName } from "@/lib/class-management";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Panel Admin — Bimbelajar" }, { name: "description", content: "Kelola kelas, peserta, voucher dan program referral Bimbelajar." }, { property: "og:title", content: "Panel Admin — Bimbelajar" }, { property: "og:description", content: "Kelola kelas, peserta, voucher dan program referral Bimbelajar." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
@@ -25,10 +28,32 @@ function useClasses() {
   return useQuery({
     queryKey: ["admin-classes"],
     queryFn: async () => {
-      const { data } = await supabase.from("classes").select("*, class_private(*)").order("sort_order");
+      const { data, error } = await supabase.from("classes").select("*, class_private(*)").order("sort_order");
+      if (error) throw error;
       return data ?? [];
     },
   });
+}
+
+function useSubjects() {
+  return useQuery({
+    queryKey: ["admin-subjects"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("subjects").select("*").order("sort_order");
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
+
+function SubjectPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { data } = useSubjects();
+  return <div className="space-y-1"><Label>Ilmu</Label>
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger aria-label="Ilmu"><SelectValue placeholder="Pilih ilmu" /></SelectTrigger>
+      <SelectContent>{data?.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}{!s.is_active && " (nonaktif)"}</SelectItem>)}</SelectContent>
+    </Select>
+  </div>;
 }
 
 function Admin() {
@@ -102,13 +127,16 @@ function KelolaKelas() {
 
   async function save() {
     if (!edit) return;
+    if (!edit.name?.trim() || !edit.subject_id) { toast.error("Nama kelas dan ilmu wajib diisi."); return; }
     const { whatsapp_link = "", zoom_link = "", ...rest } = edit;
     const payload = {
       slug: rest.slug || (rest.name ?? "kelas").toLowerCase().replace(/[^a-z0-9]+/g, "-"),
       name: rest.name ?? "", tagline: rest.tagline ?? "", description: rest.description ?? "", goals: rest.goals ?? "",
       levels_label: rest.levels_label ?? "Level 1–2", schedule: rest.schedule ?? "", quota: Number(rest.quota ?? 10),
       price: Number(rest.price ?? 0), price_prefix: rest.price_prefix ?? "", is_active: rest.is_active ?? true,
-      sort_order: rest.sort_order ?? 99,
+      sort_order: rest.sort_order ?? 99, subject_id: edit.subject_id,
+      level_number: Number(rest.level_number ?? 1), level_label: rest.level_label ?? "Baru Belajar",
+      advantages: rest.advantages ?? "",
     };
     const res = rest.id
       ? await supabase.from("classes").update(payload).eq("id", rest.id).select().single()
@@ -125,34 +153,44 @@ function KelolaKelas() {
     <div className="space-y-1">
       <Label>{label}</Label>
       {type === "area" ? (
-        <Textarea value={String(edit?.[k] ?? "")} onChange={(e) => setEdit({ ...edit!, [k]: e.target.value })} />
+        <Textarea value={String(edit?.[k] ?? "")} onChange={(e) => setEdit({ ...edit, [k]: e.target.value })} />
       ) : (
-        <Input type={type} value={String(edit?.[k] ?? "")} onChange={(e) => setEdit({ ...edit!, [k]: e.target.value })} />
+        <Input type={type} value={String(edit?.[k] ?? "")} onChange={(e) => setEdit({ ...edit, [k]: e.target.value })} />
       )}
     </div>
   );
 
   return (
     <div className="mt-4 space-y-3">
-      <Button onClick={() => setEdit({ is_active: true })}>+ Tambah kelas</Button>
+      <Button onClick={() => setEdit({ is_active: true, level_number: 1, level_label: "Baru Belajar" })}>+ Tambah kelas</Button>
       {data?.map((c) => (
-        <div key={c.id} className="flex items-center justify-between rounded-2xl border bg-card p-4">
+        <div key={c.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4">
           <div>
-            <p className="font-semibold">{c.name} {!c.is_active && <span className="text-xs text-muted-foreground">(nonaktif)</span>}</p>
+            <p className="font-semibold">{classLevelName(c)} {!c.is_active && <span className="text-xs text-muted-foreground">(nonaktif)</span>}</p>
             <p className="text-sm text-muted-foreground">{c.price_prefix} {rupiah(c.price)} · kuota {c.quota}</p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setEdit({ ...c, whatsapp_link: c.class_private?.whatsapp_link ?? "", zoom_link: c.class_private?.zoom_link ?? "" })}>Ubah</Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setEdit({ ...c, whatsapp_link: c.class_private?.whatsapp_link ?? "", zoom_link: c.class_private?.zoom_link ?? "" })}>Ubah</Button>
+            <AdminDelete name={classLevelName(c)} description="Sesi dan rekaman kelas ini ikut dihapus. Kelas yang memiliki pendaftar tidak dapat dihapus; nonaktifkan kelas untuk menyimpan riwayat pembayaran." onDelete={async () => {
+              const { error } = await supabase.from("classes").delete().eq("id", c.id);
+              if (error) throw new Error(error.message);
+              await qc.invalidateQueries();
+            }} />
+          </div>
         </div>
       ))}
       <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{edit?.id ? "Ubah kelas" : "Kelas baru"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
+            <SubjectPicker value={edit?.subject_id ?? ""} onChange={(v) => setEdit((current) => current ? { ...current, subject_id: v } : null)} />
             {f("name", "Nama kelas")}{f("tagline", "Tagline")}{f("description", "Deskripsi", "area")}{f("goals", "Tujuan", "area")}
+            {f("advantages", "Keunggulan", "area")}
+            {f("level_number", "Nomor level", "number")}{f("level_label", "Nama level")}
             {f("levels_label", "Level")}{f("schedule", "Jadwal")}{f("quota", "Kuota", "number")}
             {f("price_prefix", "Awalan harga (mis. Mulai)")}{f("price", "Harga per bulan (Rp)", "number")}
             {f("whatsapp_link", "Link grup WhatsApp")}{f("zoom_link", "Link Zoom")}
-            <div className="flex items-center gap-2"><Switch checked={edit?.is_active ?? true} onCheckedChange={(v) => setEdit({ ...edit!, is_active: v })} /><Label>Tampilkan ke publik</Label></div>
+            <div className="flex items-center gap-2"><Switch checked={edit?.is_active ?? true} onCheckedChange={(v) => setEdit({ ...edit, is_active: v })} /><Label>Tampilkan ke publik</Label></div>
             <Button className="w-full" onClick={save}>Simpan</Button>
           </div>
         </DialogContent>
@@ -161,24 +199,30 @@ function KelolaKelas() {
   );
 }
 
-function ClassPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function ClassPicker({ value, onChange, subjectId }: { value: string; onChange: (v: string) => void; subjectId?: string }) {
   const { data } = useClasses();
-  useEffect(() => { if (!value && data?.[0]) onChange(data[0].id); }, [data, value, onChange]);
-  return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className="h-11 w-full rounded-xl border bg-card px-3">
-      {data?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-    </select>
-  );
+  const choices = subjectId === undefined ? (data ?? []) : classesInSubject(data ?? [], subjectId);
+  useEffect(() => {
+    if (value && !choices.some((c) => c.id === value)) onChange("");
+  }, [choices, value, onChange]);
+  return <div className="space-y-1"><Label>Kelas</Label>
+    <Select value={value} onValueChange={onChange} disabled={subjectId === "" || choices.length === 0}>
+      <SelectTrigger aria-label="Kelas"><SelectValue placeholder={choices.length ? "Pilih kelas" : "Belum ada kelas"} /></SelectTrigger>
+      <SelectContent>{choices.map((c) => <SelectItem key={c.id} value={c.id}>{classLevelName(c)}{!c.is_active && " (nonaktif)"}</SelectItem>)}</SelectContent>
+    </Select>
+  </div>;
 }
 
 function KelolaSesi() {
+  const [subjectId, setSubjectId] = useState("");
   const [classId, setClassId] = useState("");
   const qc = useQueryClient();
-  const { data } = useQuery({
+  const { data, refetch } = useQuery({
     queryKey: ["admin-sesi", classId],
     enabled: !!classId,
     queryFn: async () => {
-      const { data: s } = await supabase.from("class_sessions").select("*").eq("class_id", classId).order("level").order("number");
+      const { data: s, error } = await supabase.from("class_sessions").select("*").eq("class_id", classId).order("level").order("number");
+      if (error) throw error;
       const { data: r } = await supabase.from("session_recordings").select("*").eq("class_id", classId);
       return (s ?? []).map((x) => ({ ...x, video_url: r?.find((y) => y.session_id === x.id)?.video_url ?? "" }));
     },
@@ -188,21 +232,24 @@ function KelolaSesi() {
     const last = data?.at(-1);
     const level = last ? (last.number >= 16 ? last.level + 1 : last.level) : 1;
     const number = last ? (last.number >= 16 ? 1 : last.number + 1) : 1;
-    const { error } = await supabase.from("class_sessions").insert({ class_id: classId, level, number, title: "Sesi baru" });
+    const { error } = await supabase.from("class_sessions").insert({ class_id: classId, level, number, title: "Sesi baru", is_published: false });
     if (error) { toast.error(error.message); return; }
-    qc.invalidateQueries({ queryKey: ["admin-sesi", classId] });
+    await refetch();
+    qc.invalidateQueries();
   }
 
   return (
     <div className="mt-4 space-y-3">
-      <ClassPicker value={classId} onChange={setClassId} />
-      {data?.map((s) => <SessionRow key={s.id} s={s} classId={classId} />)}
+      <SubjectPicker value={subjectId} onChange={(v) => { setSubjectId(v); setClassId(""); }} />
+      <ClassPicker value={classId} onChange={setClassId} subjectId={subjectId} />
+      {classId && data?.length === 0 && <p className="text-muted-foreground">Belum ada sesi.</p>}
+      {data?.map((s) => <SessionRow key={s.id} s={s} classId={classId} onSaved={async () => { await refetch(); }} />)}
       {classId && <Button variant="outline" onClick={addSession}>+ Tambah sesi</Button>}
     </div>
   );
 }
 
-function SessionRow({ s, classId }: { s: Tables<"class_sessions"> & { video_url: string }; classId: string }) {
+function SessionRow({ s, classId, onSaved }: { s: Tables<"class_sessions"> & { video_url: string }; classId: string; onSaved: () => Promise<void> }) {
   const [v, setV] = useState(s);
   const qc = useQueryClient();
   async function save() {
@@ -212,12 +259,15 @@ function SessionRow({ s, classId }: { s: Tables<"class_sessions"> & { video_url:
       ? await supabase.from("session_recordings").upsert({ session_id: s.id, class_id: classId, video_url: v.video_url.trim() })
       : await supabase.from("session_recordings").delete().eq("session_id", s.id);
     if (r.error) { toast.error(r.error.message); return; }
-    toast.success(`Sesi ${v.number} disimpan.`);
-    qc.invalidateQueries({ queryKey: ["admin-sesi", classId] });
+    const published = await supabase.from("class_sessions").update({ is_published: v.is_published }).eq("id", s.id);
+    if (published.error) { toast.error(published.error.message); return; }
+    toast.success(v.is_published ? `Sesi ${v.number} diterbitkan.` : `Sesi ${v.number} disimpan sebagai draf.`);
+    await onSaved();
+    qc.invalidateQueries();
   }
   return (
     <details className="rounded-2xl border bg-card p-4">
-      <summary className="cursor-pointer font-medium">L{s.level} · Sesi {s.number}: {s.title} {s.video_url && "🎬"}</summary>
+      <summary className="cursor-pointer font-medium">L{s.level} · Sesi {s.number}: {s.title} · {s.is_published ? "Terbit" : "Draf"} {s.video_url && "🎬"}</summary>
       <div className="mt-3 space-y-2">
         <div className="grid grid-cols-2 gap-2">
           <div><Label>Level</Label><Input type="number" value={v.level} onChange={(e) => setV({ ...v, level: Number(e.target.value) })} /></div>
@@ -226,8 +276,17 @@ function SessionRow({ s, classId }: { s: Tables<"class_sessions"> & { video_url:
         <Label>Judul</Label><Input value={v.title} onChange={(e) => setV({ ...v, title: e.target.value })} />
         <Label>Deskripsi</Label><Textarea value={v.description} onChange={(e) => setV({ ...v, description: e.target.value })} />
         <Label>Jadwal (mis. Sabtu, 12 Okt 08.00 WIB)</Label><Input value={v.scheduled_at} onChange={(e) => setV({ ...v, scheduled_at: e.target.value })} />
-        <Label>Link rekaman (YouTube / Vimeo / Google Drive)</Label><Input value={v.video_url} onChange={(e) => setV({ ...v, video_url: e.target.value })} placeholder="https://youtu.be/..." />
-        <Button size="sm" onClick={save}>Simpan</Button>
+        <Label>Link rekaman (YouTube / Vimeo / Google Drive / Dailymotion)</Label><Input value={v.video_url} onChange={(e) => setV({ ...v, video_url: e.target.value })} placeholder="https://youtu.be/..." />
+        <div className="flex items-center gap-2"><Switch id={`publish-${s.id}`} checked={v.is_published} onCheckedChange={(is_published) => setV({ ...v, is_published })} /><Label htmlFor={`publish-${s.id}`}>Terbitkan untuk murid</Label></div>
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={save}>{v.is_published ? "Simpan dan terbitkan" : "Simpan draf"}</Button>
+          <AdminDelete name={`sesi ${s.number}`} description="Sesi dan link rekamannya akan dihapus permanen." onDelete={async () => {
+            const { error } = await supabase.from("class_sessions").delete().eq("id", s.id);
+            if (error) throw new Error(error.message);
+            await onSaved();
+            await qc.invalidateQueries();
+          }} />
+        </div>
       </div>
     </details>
   );
@@ -322,13 +381,7 @@ type SubjectForm = Partial<Tables<"subjects">>;
 function KelolaIlmu() {
   const qc = useQueryClient();
   const [edit, setEdit] = useState<SubjectForm | null>(null);
-  const { data } = useQuery({
-    queryKey: ["admin-subjects"],
-    queryFn: async () => {
-      const { data } = await supabase.from("subjects").select("*").order("sort_order");
-      return data ?? [];
-    },
-  });
+  const { data } = useSubjects();
 
   async function save() {
     if (!edit) return;
@@ -350,22 +403,29 @@ function KelolaIlmu() {
     <div className="mt-4 space-y-3">
       <Button onClick={() => setEdit({ is_active: true })}>+ Tambah ilmu</Button>
       {data?.map((s) => (
-        <div key={s.id} className="flex items-center justify-between rounded-2xl border bg-card p-4">
+        <div key={s.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4">
           <div>
             <p className="font-semibold">{s.name} {!s.is_active && <span className="text-xs text-muted-foreground">(nonaktif)</span>}</p>
             <p className="line-clamp-2 text-sm text-muted-foreground">{s.bio}</p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setEdit(s)}>Ubah</Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setEdit(s)}>Ubah</Button>
+            <AdminDelete name={s.name} description="Ilmu akan dihapus permanen. Pindahkan atau hapus kelas di dalamnya terlebih dahulu." onDelete={async () => {
+              const { error } = await supabase.from("subjects").delete().eq("id", s.id);
+              if (error) throw new Error(error.message);
+              await qc.invalidateQueries();
+            }} />
+          </div>
         </div>
       ))}
       <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>{edit?.id ? "Ubah ilmu" : "Ilmu baru"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-1"><Label>Nama ilmu</Label><Input value={edit?.name ?? ""} onChange={(e) => setEdit({ ...edit!, name: e.target.value })} /></div>
-            <div className="space-y-1"><Label>Deskripsi / bio</Label><Textarea value={edit?.bio ?? ""} onChange={(e) => setEdit({ ...edit!, bio: e.target.value })} /></div>
-            <div className="space-y-1"><Label>Urutan tampil</Label><Input type="number" value={edit?.sort_order ?? 0} onChange={(e) => setEdit({ ...edit!, sort_order: Number(e.target.value) })} /></div>
-            <div className="flex items-center gap-2"><Switch checked={edit?.is_active ?? true} onCheckedChange={(v) => setEdit({ ...edit!, is_active: v })} /><Label>Tampilkan ke publik</Label></div>
+            <div className="space-y-1"><Label>Nama ilmu</Label><Input value={edit?.name ?? ""} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Deskripsi / bio</Label><Textarea value={edit?.bio ?? ""} onChange={(e) => setEdit({ ...edit, bio: e.target.value })} /></div>
+            <div className="space-y-1"><Label>Urutan tampil</Label><Input type="number" value={edit?.sort_order ?? 0} onChange={(e) => setEdit({ ...edit, sort_order: Number(e.target.value) })} /></div>
+            <div className="flex items-center gap-2"><Switch checked={edit?.is_active ?? true} onCheckedChange={(v) => setEdit({ ...edit, is_active: v })} /><Label>Tampilkan ke publik</Label></div>
             <Button className="w-full" onClick={save}>Simpan</Button>
           </div>
         </DialogContent>
@@ -430,18 +490,18 @@ function KelolaVoucher() {
         <DialogContent>
           <DialogHeader><DialogTitle>{edit?.id ? "Ubah voucher" : "Voucher baru"}</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-1"><Label>Kode voucher</Label><Input value={edit?.code ?? ""} onChange={(e) => setEdit({ ...edit!, code: e.target.value })} placeholder="Contoh: AJAKTEMAN" /></div>
+            <div className="space-y-1"><Label>Kode voucher</Label><Input value={edit?.code ?? ""} onChange={(e) => setEdit({ ...edit, code: e.target.value })} placeholder="Contoh: AJAKTEMAN" /></div>
             <div className="space-y-1">
               <Label>Jenis diskon</Label>
-              <select value={edit?.discount_type ?? "percent"} onChange={(e) => setEdit({ ...edit!, discount_type: e.target.value })} className="h-11 w-full rounded-xl border bg-card px-3">
+              <select value={edit?.discount_type ?? "percent"} onChange={(e) => setEdit({ ...edit, discount_type: e.target.value })} className="h-11 w-full rounded-xl border bg-card px-3">
                 <option value="percent">Persen (%)</option>
                 <option value="fixed">Potongan harga (Rp)</option>
               </select>
             </div>
-            <div className="space-y-1"><Label>Nilai diskon {edit?.discount_type === "fixed" ? "(Rp)" : "(%)"}</Label><Input type="number" value={edit?.discount_value ?? 0} onChange={(e) => setEdit({ ...edit!, discount_value: Number(e.target.value) })} /></div>
-            <div className="space-y-1"><Label>Batas pemakaian (kosongkan = tanpa batas)</Label><Input type="number" value={edit?.max_uses ?? ""} onChange={(e) => setEdit({ ...edit!, max_uses: e.target.value ? Number(e.target.value) : null })} /></div>
-            <div className="space-y-1"><Label>Berlaku sampai (kosongkan = selamanya)</Label><Input type="date" value={edit?.expires_at ?? ""} onChange={(e) => setEdit({ ...edit!, expires_at: e.target.value })} /></div>
-            <div className="flex items-center gap-2"><Switch checked={edit?.is_active ?? true} onCheckedChange={(v) => setEdit({ ...edit!, is_active: v })} /><Label>Aktif</Label></div>
+            <div className="space-y-1"><Label>Nilai diskon {edit?.discount_type === "fixed" ? "(Rp)" : "(%)"}</Label><Input type="number" value={edit?.discount_value ?? 0} onChange={(e) => setEdit({ ...edit, discount_value: Number(e.target.value) })} /></div>
+            <div className="space-y-1"><Label>Batas pemakaian (kosongkan = tanpa batas)</Label><Input type="number" value={edit?.max_uses ?? ""} onChange={(e) => setEdit({ ...edit, max_uses: e.target.value ? Number(e.target.value) : null })} /></div>
+            <div className="space-y-1"><Label>Berlaku sampai (kosongkan = selamanya)</Label><Input type="date" value={edit?.expires_at ?? ""} onChange={(e) => setEdit({ ...edit, expires_at: e.target.value })} /></div>
+            <div className="flex items-center gap-2"><Switch checked={edit?.is_active ?? true} onCheckedChange={(v) => setEdit({ ...edit, is_active: v })} /><Label>Aktif</Label></div>
             <Button className="w-full" onClick={save}>Simpan</Button>
           </div>
         </DialogContent>

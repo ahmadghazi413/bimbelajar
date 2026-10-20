@@ -45,6 +45,7 @@ export type Database = {
           class_id: string
           description: string
           id: string
+          is_published: boolean
           level: number
           number: number
           scheduled_at: string
@@ -54,6 +55,7 @@ export type Database = {
           class_id: string
           description?: string
           id?: string
+          is_published?: boolean
           level?: number
           number: number
           scheduled_at?: string
@@ -63,6 +65,7 @@ export type Database = {
           class_id?: string
           description?: string
           id?: string
+          is_published?: boolean
           level?: number
           number?: number
           scheduled_at?: string
@@ -80,6 +83,7 @@ export type Database = {
       }
       classes: {
         Row: {
+          advantages: string
           created_at: string
           description: string
           goals: string
@@ -99,6 +103,7 @@ export type Database = {
           tagline: string
         }
         Insert: {
+          advantages?: string
           created_at?: string
           description?: string
           goals?: string
@@ -118,6 +123,7 @@ export type Database = {
           tagline?: string
         }
         Update: {
+          advantages?: string
           created_at?: string
           description?: string
           goals?: string

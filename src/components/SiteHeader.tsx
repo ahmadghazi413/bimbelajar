@@ -15,8 +15,8 @@ export function SiteHeader() {
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  const siteName = settings?.site_name?.trim() || "PadatIlmu";
-  const logoUrl = settings?.logo_url || "";
+  const siteName = settings?.["site_name"]?.trim() || "PadatIlmu";
+  const logoUrl = settings?.["logo_url"] || "";
 
   async function logout() {
     setOpen(false);
@@ -48,8 +48,6 @@ export function SiteHeader() {
   </span>
 </Link>
 
-        </Link>
-
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" aria-label="Menu">
@@ -80,7 +78,7 @@ export function SiteHeader() {
                 <Link to="/auth" className={item}>Masuk / Daftar</Link>
               )}
               <a
-                href={settings?.admin_whatsapp ? `https://wa.me/${settings.admin_whatsapp}` : "https://wa.me/62881022392900"}
+                href={settings?.["admin_whatsapp"] ? `https://wa.me/${settings["admin_whatsapp"]}` : "https://wa.me/62881022392900"}
                 target="_blank"
                 rel="noreferrer"
                 className={`${item} flex items-center gap-2`}
