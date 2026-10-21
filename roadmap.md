@@ -10,6 +10,7 @@
 - [x] Periksa panel admin dan alur perubahan melalui website.
 
 # Bukti pembayaran
+- [ ] Wajib unggah bukti sebelum tombol konfirmasi pembayaran; uji urutan melalui akun masuk.
 - [x] Unggah foto transfer/QRIS dengan validasi dan pratinjau.
 - [x] Admin melihat, mengunduh, dan menghapus bukti tanpa menghapus pembayaran.
 - [x] Uji validasi foto, perlindungan pembayaran, dan alur unggah → unduh → hapus melalui akun masuk.

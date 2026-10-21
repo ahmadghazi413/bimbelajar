@@ -15,3 +15,4 @@
 - Class and subject deletion is guarded in PostgreSQL to preserve enrollment history and prevent orphaned classes; empty classes may be permanently deleted with their sessions and recordings.
 - Session publication is enforced by RLS on sessions and recordings; admin queries retain access to drafts while student views only receive published sessions.
 - Payment proofs use unique private storage paths and an ownership-validating submit RPC; admin deletion removes the file then conditionally clears its matching pointer, never payment status or history. Shared proof controls prefetch a Blob for previews and activation-safe downloads.
+- Payment uploads are staged privately before confirmation; only the explicit confirmation action creates the enrollment and attaches its proof through the existing ownership-validating RPC.
