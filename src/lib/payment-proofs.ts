@@ -3,6 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 export const PROOF_MAX_BYTES = 5 * 1024 * 1024;
 export const PROOF_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
+export function canConfirmPayment(proofPath: string | null | undefined, busy: boolean) {
+  return !!proofPath?.trim() && !busy;
+}
+
 export function validateProof(file: Pick<File, "type" | "size">) {
   if (!PROOF_TYPES.includes(file.type)) throw new Error("Gunakan foto JPG, PNG, atau WebP.");
   if (file.size === 0 || file.size > PROOF_MAX_BYTES) throw new Error("Ukuran foto maksimal 5 MB dan tidak boleh kosong.");

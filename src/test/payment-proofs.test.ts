@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 const mocks = vi.hoisted(() => ({ remove: vi.fn(), update: vi.fn(), eq: vi.fn(), from: vi.fn() }));
 vi.mock("@/integrations/supabase/client", () => ({ supabase: { storage: { from: () => ({ remove: mocks.remove }) }, from: mocks.from } }));
-import { removePaymentProof, validateProof } from "@/lib/payment-proofs";
+import { canConfirmPayment, removePaymentProof, validateProof } from "@/lib/payment-proofs";
 
 describe("Payment proofs", () => {
   beforeEach(() => {
@@ -18,6 +18,12 @@ describe("Payment proofs", () => {
   it("rejects non-photo and empty uploads", () => {
     expect(() => validateProof({ type: "application/pdf", size: 100 })).toThrow();
     expect(() => validateProof({ type: "image/jpeg", size: 0 })).toThrow();
+  });
+  it("requires an uploaded proof before payment confirmation and blocks confirmation while uploading", () => {
+    expect(canConfirmPayment(null, false)).toBe(false);
+    expect(canConfirmPayment("", false)).toBe(false);
+    expect(canConfirmPayment("owner/proof.png", true)).toBe(false);
+    expect(canConfirmPayment("owner/proof.png", false)).toBe(true);
   });
   it("deletes only the proof, preserving payment fields and concurrent replacements", async () => {
     await removePaymentProof("payment-id", "owner/proof.png");
