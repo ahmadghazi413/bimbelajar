@@ -200,7 +200,7 @@ function Bayar() {
   </>
 )}
 
-  );
+ </Page> );
 }
 
 function TransferInfo({ amount, qris, bank }: { amount: number; qris: string; bank: { bank: string; number: string; holder: string } }) {
