@@ -21,11 +21,11 @@ describe.skipIf(!url || !key)("Session publication and deletion", () => {
     let subjectId = "";
     let classId = "";
     try {
-      const subject = check(await admin.from("subjects").insert({ name: "Publication test", slug: `test-${crypto.randomUUID()}` }).select("id").single());
+      const subject = check<{ id: string }>(await admin.from("subjects").insert({ name: "Publication test", slug: `test-${crypto.randomUUID()}` }).select("id").single());
       subjectId = subject.id;
-      const klass = check(await admin.from("classes").insert({ name: "Publication test", slug: `test-${crypto.randomUUID()}`, subject_id: subjectId }).select("id").single());
+      const klass = check<{ id: string }>(await admin.from("classes").insert({ name: "Publication test", slug: `test-${crypto.randomUUID()}`, subject_id: subjectId }).select("id").single());
       classId = klass.id;
-      const session = check(await admin.from("class_sessions").insert({ class_id: classId, number: 1, title: "Draft", is_published: false }).select("id").single());
+      const session = check<{ id: string }>(await admin.from("class_sessions").insert({ class_id: classId, number: 1, title: "Draft", is_published: false }).select("id").single());
       expect(check(await anon.from("class_sessions").select("id").eq("id", session.id))).toEqual([]);
       check(await admin.from("class_sessions").update({ is_published: true }).eq("id", session.id).select("id"));
       expect(check(await anon.from("class_sessions").select("id").eq("id", session.id))).toEqual([{ id: session.id }]);
