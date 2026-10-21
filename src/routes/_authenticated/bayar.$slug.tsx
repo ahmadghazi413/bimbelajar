@@ -51,7 +51,7 @@ function Bayar() {
   });
   const [sender, setSender] = useState("");
   const [busy, setBusy] = useState(false);
-  const [stagedProof, setStagedProof] = useState<string | null>(null);
+  const [stagedProof, setStagedProof] = useState<File | null>(null);
   const [voucher, setVoucher] = useState("");
   const [applied, setApplied] = useState<{ code: string; kind: string } | null>(null);
   const [useReward, setUseReward] = useState(false);
@@ -89,7 +89,7 @@ function Bayar() {
   }
 
   async function daftar() {
-    if (!c || !canConfirmPayment(stagedProof, busy) || !stagedProof) return;
+    if (!c || !canConfirmPayment(stagedProof?.name, busy) || !stagedProof) return;
     if ((!e || e.status === "rejected") && (!sender.trim() || !quote.data || quote.error || (voucher.trim() && !applied))) return;
     setBusy(true);
     try {
@@ -106,8 +106,19 @@ function Bayar() {
         qc.setQueryData(["my-enrollment", slug], data);
       }
       if (!enrollment) throw new Error("Pendaftaran belum dapat dibuat.");
-      const { error } = await supabase.rpc("submit_proof", { _enrollment_id: enrollment.id, _proof_url: stagedProof });
-      if (error) throw new Error(error.message);
+      const ext = stagedProof.type === "image/png" ? "png" : stagedProof.type === "image/webp" ? "webp" : "jpg";
+      const proofPath = `${userId}/${enrollment.id}-${crypto.randomUUID()}.${ext}`;
+      const upload = await supabase.storage.from("payment-proofs").upload(proofPath, stagedProof);
+      if (upload.error) throw new Error(upload.error.message);
+
+      const { error } = await supabase.rpc("submit_proof", {
+        _enrollment_id: enrollment.id,
+        _proof_url: proofPath,
+      });
+      if (error) {
+        await supabase.storage.from("payment-proofs").remove([proofPath]);
+        throw new Error(error.message);
+      }
       if (enrollment.proof_url) await supabase.storage.from("payment-proofs").remove([enrollment.proof_url]);
       setStagedProof(null);
       await qc.invalidateQueries({ queryKey: ["my-enrollment", slug] });
@@ -122,15 +133,10 @@ function Bayar() {
     if (e?.status === "paid" || busy) return;
     try { validateProof(file); } catch (error) { toast.error(error instanceof Error ? error.message : "Foto tidak valid."); return; }
     setBusy(true);
-    const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
-    const path = `${userId}/${crypto.randomUUID()}.${ext}`;
     try {
-      const up = await supabase.storage.from("payment-proofs").upload(path, file);
-      if (up.error) throw new Error(up.error.message);
-      if (stagedProof) await supabase.storage.from("payment-proofs").remove([stagedProof]);
-      setStagedProof(path);
-      toast.success("Bukti berhasil diunggah.");
-    } catch (error) { toast.error("Gagal mengirim bukti: " + (error instanceof Error ? error.message : "Coba lagi.")); }
+      setStagedProof(file);
+      toast.success("Bukti dipilih. Tekan ‘Saya sudah bayar’ untuk mengirim.");
+    } catch (error) { toast.error("Gagal memilih bukti: " + (error instanceof Error ? error.message : "Coba lagi.")); }
     finally { setBusy(false); }
   }
 
@@ -148,8 +154,8 @@ function Bayar() {
             <>
               <TransferInfo amount={e.amount} qris={qris ?? ""} bank={bank} />
               <ProofUpload busy={busy} hasProof={!!stagedProof || !!e.proof_url} onPick={uploadProof} />
-              {stagedProof && <PaymentProof path={stagedProof} enrollmentId={e.id} />}
-              {(!e.proof_url || stagedProof) && <Button variant="hero" size="lg" className="w-full" disabled={!canConfirmPayment(stagedProof, busy)} onClick={daftar}>{busy ? "Memproses..." : "Saya sudah bayar"}</Button>}
+              {stagedProof && <p className="text-sm text-muted-foreground">File dipilih: {stagedProof.name}</p>}
+              {(!e.proof_url || stagedProof) && <Button variant="hero" size="lg" className="w-full" disabled={!canConfirmPayment(stagedProof?.name, busy)} onClick={daftar}>{busy ? "Memproses..." : "Saya sudah bayar"}</Button>}
               <p className="text-sm text-muted-foreground">Setelah transfer dan mengirim bukti, admin akan mengecek dan mengaktifkan kelas Anda (biasanya kurang dari 1×24 jam).</p>
             </>
           )}
@@ -179,8 +185,8 @@ function Bayar() {
             <Input id="s" value={sender} onChange={(ev) => setSender(ev.target.value)} className="h-12" placeholder="Contoh: Siti Aminah" />
           </div>
           <ProofUpload busy={busy} hasProof={!!stagedProof} onPick={uploadProof} />
-          {stagedProof && <PaymentProof path={stagedProof} enrollmentId="" />}
-          <Button variant="hero" size="lg" className="w-full" disabled={!canConfirmPayment(stagedProof, busy) || !sender.trim() || quote.isFetching || !!quote.error || !quote.data || (!!voucher.trim() && !applied)} onClick={daftar}>{busy ? "Memproses..." : "Saya sudah bayar"}</Button>
+          {stagedProof && <p className="text-sm text-muted-foreground">File dipilih: {stagedProof.name}</p>}
+          <Button variant="hero" size="lg" className="w-full" disabled={!canConfirmPayment(stagedProof?.name, busy) || !sender.trim() || quote.isFetching || !!quote.error || !quote.data || (!!voucher.trim() && !applied)} onClick={daftar}>{busy ? "Memproses..." : "Saya sudah bayar"}</Button>
         </div>
       )}
       {wa && (
