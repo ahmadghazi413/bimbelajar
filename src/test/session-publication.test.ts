@@ -2,15 +2,18 @@ import { describe, expect, it } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
+import type { Database } from "@/integrations/supabase/types";
 
 const url = process.env["SUPABASE_URL"];
 const key = process.env["SUPABASE_ANON_KEY"] ?? process.env["SUPABASE_PUBLISHABLE_KEY"];
 describe.skipIf(!url || !key)("Session publication and deletion", () => {
   it("hides draft sessions, publishes them, and prevents deleting an ilmu containing classes", async () => {
     if (!url || !key) throw new Error("Hosted test configuration required");
-    const minted = JSON.parse(readFileSync(`${homedir()}/.cache/lovable-auth/session.json`, "utf8"));
-    const admin = createClient(url, key, { auth: { persistSession: false }, global: { headers: { Authorization: `Bearer ${minted.session.access_token}` } } });
-    const anon = createClient(url, key, { auth: { persistSession: false } });
+    const session = process.env["LOVABLE_BROWSER_SUPABASE_SESSION_JSON"]
+      ? JSON.parse(process.env["LOVABLE_BROWSER_SUPABASE_SESSION_JSON"] ?? "{}")
+      : JSON.parse(readFileSync(`${homedir()}/.cache/lovable-auth/session.json`, "utf8")).session;
+    const admin = createClient<Database>(url, key, { auth: { persistSession: false }, global: { headers: { Authorization: `Bearer ${session.access_token}` } } });
+    const anon = createClient<Database>(url, key, { auth: { persistSession: false } });
     const check = <T,>(result: { data: T | null; error: { message: string } | null }): NonNullable<T> => {
       if (result.error || result.data === null) throw new Error(result.error?.message ?? "missing data");
       return result.data as NonNullable<T>;
