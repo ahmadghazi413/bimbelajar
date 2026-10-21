@@ -64,6 +64,13 @@
       "when": 1792463942411,
       "tag": "0008_class_advantages_session_publication",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792541893578,
+      "tag": "0009_payment_proof_management",
+      "breakpoints": true
     }
   ]
 }
