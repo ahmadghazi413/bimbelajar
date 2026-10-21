@@ -7,7 +7,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { classDetailQuery, settingsQuery } from "@/lib/queries";
 import { rupiah } from "@/lib/format";
 import { Page, StatusBadge } from "@/components/PageTitle";
-import { SessionList } from "@/components/SessionList";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -194,9 +193,13 @@ function Bayar() {
           <a href={wa} target="_blank" rel="noreferrer"><MessageCircle /> Butuh bantuan? Chat Admin</a>
         </Button>
       )}
-      <h2 className="mb-4 mt-8 text-2xl font-semibold">Sesi yang akan dipelajari</h2>
-      <SessionList sessions={c.class_sessions} />
-    </Page>
+      {c.advantages?.trim() && (
+  <>
+    <h2 className="mb-4 mt-8 text-2xl font-semibold">Keunggulan</h2>
+    <p className="whitespace-pre-line leading-relaxed">{c.advantages}</p>
+  </>
+)}
+
   );
 }
 
