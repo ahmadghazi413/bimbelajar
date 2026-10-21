@@ -18,6 +18,7 @@ import { ReferralSettings } from "@/components/ReferralSettings";
 import { AdminDelete } from "@/components/AdminDelete";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { classesInSubject, classLevelName } from "@/lib/class-management";
+import { PaymentProof } from "@/components/PaymentProof";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({ meta: [{ title: "Panel Admin — Bimbelajar" }, { name: "description", content: "Kelola kelas, peserta, voucher dan program referral Bimbelajar." }, { property: "og:title", content: "Panel Admin — Bimbelajar" }, { property: "og:description", content: "Kelola kelas, peserta, voucher dan program referral Bimbelajar." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
@@ -334,7 +335,7 @@ function Peserta() {
           </div>
           {x.voucher_code && <p className="text-sm text-muted-foreground">Voucher: {x.voucher_code}</p>}
           {x.referral_code && <p className="break-all text-sm text-muted-foreground">Referral: {x.referral_code} · Bonus pengajak: {rupiah(x.referral_reward_amount)}</p>}
-          {x.proof_url && <ProofLink path={x.proof_url} />}
+          {x.proof_url ? <PaymentProof path={x.proof_url} enrollmentId={x.id} admin /> : <p className="text-sm text-muted-foreground">Belum ada bukti pembayaran.</p>}
           {x.status === "pending" && (
             <div className="flex gap-2">
               <Button size="sm" variant="success" onClick={() => setStatus(x.id, "paid")}>Konfirmasi lunas</Button>
@@ -357,22 +358,6 @@ function ProgressEditor({ p, onSave }: { p: Tables<"profiles">; onSave: (id: str
       <div className="flex-1"><Label className="text-xs">Hasil tes</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
       <Button size="sm" variant="secondary" onClick={() => onSave(p.id, level, notes)}>Simpan</Button>
     </div>
-  );
-}
-
-function ProofLink({ path }: { path: string }) {
-  const { data } = useQuery({
-    queryKey: ["proof", path],
-    queryFn: async () => {
-      const { data } = await supabase.storage.from("payment-proofs").createSignedUrl(path, 3600);
-      return data?.signedUrl ?? "";
-    },
-  });
-  if (!data) return null;
-  return (
-    <a href={data} target="_blank" rel="noreferrer" className="inline-block text-sm font-medium text-primary underline">
-      Lihat bukti pembayaran
-    </a>
   );
 }
 

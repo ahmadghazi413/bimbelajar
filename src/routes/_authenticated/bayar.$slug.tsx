@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { discountQuote, referralBalanceQuery } from "@/lib/referral";
+import { validateProof } from "@/lib/payment-proofs";
+import { PaymentProof } from "@/components/PaymentProof";
 
 export const Route = createFileRoute("/_authenticated/bayar/$slug")({
   head: () => ({ meta: [{ title: "Pembayaran Kelas — Bimbelajar" }, { name: "description", content: "Daftar kelas Bimbelajar dengan kode teman, voucher dan pembayaran transfer." }, { property: "og:title", content: "Pembayaran Kelas — Bimbelajar" }, { property: "og:description", content: "Daftar kelas Bimbelajar dengan kode teman, voucher dan pembayaran transfer." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
@@ -102,16 +104,24 @@ function Bayar() {
   }
 
   async function uploadProof(file: File) {
-    if (!e) return;
+    if (!e || e.status !== "pending" || busy) return;
+    try { validateProof(file); } catch (error) { toast.error(error instanceof Error ? error.message : "Foto tidak valid."); return; }
     setBusy(true);
-    const path = `${userId}/${e.id}-${file.name}`;
-    const up = await supabase.storage.from("payment-proofs").upload(path, file, { upsert: true });
-    if (up.error) { setBusy(false); toast.error("Gagal mengunggah: " + up.error.message); return; }
-    const { error } = await supabase.rpc("submit_proof", { _enrollment_id: e.id, _proof_url: path });
-    setBusy(false);
-    if (error) { toast.error("Gagal menyimpan bukti: " + error.message); return; }
-    toast.success("Bukti pembayaran terkirim. Admin akan mengecek.");
-    qc.invalidateQueries({ queryKey: ["my-enrollment", slug] });
+    const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+    const path = `${userId}/${e.id}-${crypto.randomUUID()}.${ext}`;
+    try {
+      const up = await supabase.storage.from("payment-proofs").upload(path, file);
+      if (up.error) throw new Error(up.error.message);
+      const { error } = await supabase.rpc("submit_proof", { _enrollment_id: e.id, _proof_url: path });
+      if (error) {
+        await supabase.storage.from("payment-proofs").remove([path]);
+        throw new Error(error.message);
+      }
+      if (e.proof_url) await supabase.storage.from("payment-proofs").remove([e.proof_url]);
+      toast.success("Bukti pembayaran terkirim. Admin akan mengecek.");
+      await qc.invalidateQueries({ queryKey: ["my-enrollment", slug] });
+    } catch (error) { toast.error("Gagal mengirim bukti: " + (error instanceof Error ? error.message : "Coba lagi.")); }
+    finally { setBusy(false); }
   }
 
   return (
@@ -131,6 +141,7 @@ function Bayar() {
               <p className="text-sm text-muted-foreground">Setelah transfer dan mengirim bukti, admin akan mengecek dan mengaktifkan kelas Anda (biasanya kurang dari 1×24 jam).</p>
             </>
           )}
+          {e.proof_url && <PaymentProof path={e.proof_url} enrollmentId={e.id} />}
         </div>
       ) : (
         <div className="space-y-4 rounded-3xl border bg-card p-6">
@@ -195,10 +206,10 @@ function ProofUpload({ busy, hasProof, onPick }: { busy: boolean; hasProof: bool
     <div className="rounded-2xl border border-dashed p-4">
       <Label htmlFor="proof" className="flex cursor-pointer flex-col items-center gap-2 py-2 text-center">
         <Upload className="h-6 w-6 text-primary" />
-        <span className="font-semibold">{hasProof ? "Bukti sudah terkirim — ganti bukti" : "Kirim bukti pembayaran"}</span>
+        <span className="font-semibold">{busy ? "Mengunggah bukti..." : hasProof ? "Bukti sudah terkirim — ganti bukti" : "Kirim bukti pembayaran"}</span>
         <span className="text-xs text-muted-foreground">Foto/screenshot bukti transfer atau QRIS (maks 5 MB)</span>
       </Label>
-      <input id="proof" type="file" accept="image/*" className="hidden" disabled={busy}
+      <input id="proof" type="file" accept="image/jpeg,image/png,image/webp" className="hidden" disabled={busy}
         onChange={(ev) => { const f = ev.target.files?.[0]; if (f) onPick(f); ev.target.value = ""; }} />
     </div>
   );
