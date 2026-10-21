@@ -8,3 +8,8 @@
 - [x] Pilihan ilmu untuk kelas dan penyaringan ilmu → kelas pada sesi.
 - [x] Hapus/publikasi sesi, serta keunggulan menggantikan daftar sesi publik.
 - [x] Periksa panel admin dan alur perubahan melalui website.
+
+# Bukti pembayaran
+- [x] Unggah foto transfer/QRIS dengan validasi dan pratinjau.
+- [x] Admin melihat, mengunduh, dan menghapus bukti tanpa menghapus pembayaran.
+- [x] Uji validasi foto, perlindungan pembayaran, dan alur unggah → unduh → hapus melalui akun masuk.
