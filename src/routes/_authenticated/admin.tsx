@@ -508,4 +508,476 @@ function Peserta() {
     <div className="mt-4 space-y-3">
       <ClassPicker value={classId} onChange={setClassId} />
       <p className="text-sm text-muted-foreground">{data?.filter((x) => x.status === "paid").length ?? 0} peserta lunas</p>
-      {data?.length === 0 && <p className="text-muted-foreground">Belum ada pendaf
+      {data?.length === 0 && <p className="text-muted-foreground">Belum ada pendaftar.</p>}
+      {data?.map((x) => {
+        const extraEnr = x as typeof x & { package_type?: string; sessions_total?: number };
+        return (
+          <div key={x.id} className="space-y-2 rounded-2xl border bg-card p-4">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="font-semibold">{x.profile?.full_name || "(tanpa nama)"}</p>
+                <p className="text-sm text-muted-foreground">
+                  {x.profile?.phone || "-"} · {tanggal(x.created_at)}
+                </p>
+                <p className="text-sm">
+                  {rupiah(x.amount)} · {x.method}
+                  {x.sender_name ? ` · a.n. ${x.sender_name}` : ""}
+                </p>
+                <p className="text-xs font-semibold text-primary">
+                  Paket: {extraEnr.package_type === "session" ? `Per Sesi (${extraEnr.sessions_total || 0} Sesi)` : "Bulanan"}
+                </p>
+              </div>
+              <StatusBadge status={x.status} />
+            </div>
+            {x.voucher_code && <p className="text-sm text-muted-foreground">Voucher: {x.voucher_code}</p>}
+            {x.referral_code && (
+              <p className="break-all text-sm text-muted-foreground">
+                Referral: {x.referral_code} · Bonus pengajak: {rupiah(x.referral_reward_amount)}
+              </p>
+            )}
+            {x.proof_url ? (
+              <PaymentProof path={x.proof_url} enrollmentId={x.id} admin />
+            ) : (
+              <p className="text-sm text-muted-foreground">Belum ada bukti pembayaran.</p>
+            )}
+            {x.status === "pending" && (
+              <div className="flex gap-2">
+                <Button size="sm" variant="success" onClick={() => setStatus(x.id, "paid")}>
+                  Konfirmasi lunas
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setStatus(x.id, "rejected")}>
+                  Tolak
+                </Button>
+              </div>
+            )}
+            {x.status === "paid" && x.profile && <ProgressEditor p={x.profile} onSave={setLevel} />}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ProgressEditor({ p, onSave }: { p: Tables<"profiles">; onSave: (id: string, l: number, n: string) => void }) {
+  const [level, setLevel] = useState(p.current_level ?? 0);
+  const [notes, setNotes] = useState(p.test_notes ?? "");
+  return (
+    <div className="flex flex-wrap items-end gap-2 border-t pt-2">
+      <div className="w-20">
+        <Label className="text-xs">Level</Label>
+        <Input type="number" value={level} onChange={(e) => setLevel(Number(e.target.value))} />
+      </div>
+      <div className="flex-1">
+        <Label className="text-xs">Hasil tes</Label>
+        <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+      </div>
+      <Button size="sm" variant="secondary" onClick={() => onSave(p.id, level, notes)}>
+        Simpan
+      </Button>
+    </div>
+  );
+}
+
+type SubjectForm = Partial<Tables<"subjects">>;
+
+function KelolaIlmu() {
+  const qc = useQueryClient();
+  const [edit, setEdit] = useState<SubjectForm | null>(null);
+  const { data } = useSubjects();
+
+  async function save() {
+    if (!edit) return;
+    const payload = {
+      slug: edit.slug || (edit.name ?? "ilmu").toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+      name: edit.name ?? "",
+      bio: edit.bio ?? "",
+      sort_order: edit.sort_order ?? 99,
+      is_active: edit.is_active ?? true,
+    };
+    const res = edit.id
+      ? await supabase.from("subjects").update(payload).eq("id", edit.id)
+      : await supabase.from("subjects").insert(payload);
+    if (res.error) {
+      toast.error(res.error.message);
+      return;
+    }
+    toast.success("Ilmu disimpan.");
+    setEdit(null);
+    qc.invalidateQueries();
+  }
+
+  return (
+    <div className="mt-4 space-y-3">
+      <Button onClick={() => setEdit({ is_active: true })}>+ Tambah ilmu</Button>
+      {data?.map((s) => (
+        <div key={s.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4">
+          <div>
+            <p className="font-semibold">
+              {s.name} {!s.is_active && <span className="text-xs text-muted-foreground">(nonaktif)</span>}
+            </p>
+            <p className="line-clamp-2 text-sm text-muted-foreground">{s.bio}</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setEdit(s)}>
+              Ubah
+            </Button>
+            <AdminDelete
+              name={s.name}
+              description="Ilmu akan dihapus permanen. Pindahkan atau hapus kelas di dalamnya terlebih dahulu."
+              onDelete={async () => {
+                const { error } = await supabase.from("subjects").delete().eq("id", s.id);
+                if (error) throw new Error(error.message);
+                await qc.invalidateQueries();
+              }}
+            />
+          </div>
+        </div>
+      ))}
+      <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{edit?.id ? "Ubah ilmu" : "Ilmu baru"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Nama ilmu</Label>
+              <Input value={edit?.name ?? ""} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label>Deskripsi / bio</Label>
+              <Textarea value={edit?.bio ?? ""} onChange={(e) => setEdit({ ...edit, bio: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label>Urutan tampil</Label>
+              <Input
+                type="number"
+                value={edit?.sort_order ?? 0}
+                onChange={(e) => setEdit({ ...edit, sort_order: Number(e.target.value) })}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={edit?.is_active ?? true} onCheckedChange={(v) => setEdit({ ...edit, is_active: v })} />
+              <Label>Tampilkan ke publik</Label>
+            </div>
+            <Button className="w-full" onClick={save}>
+              Simpan
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+type VoucherForm = Partial<Tables<"vouchers">>;
+
+function KelolaVoucher() {
+  const qc = useQueryClient();
+  const [edit, setEdit] = useState<VoucherForm | null>(null);
+  const { data } = useQuery({
+    queryKey: ["admin-vouchers"],
+    queryFn: async () => {
+      const { data } = await supabase.from("vouchers").select("*").order("created_at", { ascending: false });
+      return data ?? [];
+    },
+  });
+
+  async function save() {
+    if (!edit) return;
+    if (!edit.code?.trim()) {
+      toast.error("Kode voucher wajib diisi.");
+      return;
+    }
+    const payload = {
+      code: edit.code.trim().toUpperCase(),
+      discount_type: edit.discount_type ?? "percent",
+      discount_value: Number(edit.discount_value ?? 0),
+      max_uses: edit.max_uses ? Number(edit.max_uses) : null,
+      is_active: edit.is_active ?? true,
+      expires_at: edit.expires_at || null,
+    };
+    const res = edit.id
+      ? await supabase.from("vouchers").update(payload).eq("id", edit.id)
+      : await supabase.from("vouchers").insert(payload);
+    if (res.error) {
+      toast.error(res.error.message);
+      return;
+    }
+    toast.success("Voucher disimpan.");
+    setEdit(null);
+    qc.invalidateQueries({ queryKey: ["admin-vouchers"] });
+  }
+
+  return (
+    <div className="mt-4 space-y-3">
+      <Button onClick={() => setEdit({ is_active: true, discount_type: "percent", discount_value: 10 })}>
+        + Tambah voucher
+      </Button>
+      {data?.length === 0 && <p className="text-muted-foreground">Belum ada voucher.</p>}
+      {data?.map((v) => (
+        <div key={v.id} className="flex items-center justify-between rounded-2xl border bg-card p-4">
+          <div>
+            <p className="font-semibold">
+              {v.code} {!v.is_active && <span className="text-xs text-muted-foreground">(nonaktif)</span>}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Diskon {v.discount_type === "percent" ? `${v.discount_value}%` : rupiah(v.discount_value)}
+              {" · "}terpakai {v.used_count}
+              {v.max_uses ? `/${v.max_uses}` : ""}
+              {v.expires_at ? ` · s.d. ${tanggal(v.expires_at)}` : ""}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEdit({ ...v, expires_at: v.expires_at ? v.expires_at.slice(0, 10) : "" })}
+          >
+            Ubah
+          </Button>
+        </div>
+      ))}
+      <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{edit?.id ? "Ubah voucher" : "Voucher baru"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Kode voucher</Label>
+              <Input
+                value={edit?.code ?? ""}
+                onChange={(e) => setEdit({ ...edit, code: e.target.value })}
+                placeholder="Contoh: AJAKTEMAN"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Jenis diskon</Label>
+              <select
+                value={edit?.discount_type ?? "percent"}
+                onChange={(e) => setEdit({ ...edit, discount_type: e.target.value })}
+                className="h-11 w-full rounded-xl border bg-card px-3"
+              >
+                <option value="percent">Persen (%)</option>
+                <option value="fixed">Potongan harga (Rp)</option>
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label>Nilai diskon {edit?.discount_type === "fixed" ? "(Rp)" : "(%)"}</Label>
+              <Input
+                type="number"
+                value={edit?.discount_value ?? 0}
+                onChange={(e) => setEdit({ ...edit, discount_value: Number(e.target.value) })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Batas pemakaian (kosongkan = tanpa batas)</Label>
+              <Input
+                type="number"
+                value={edit?.max_uses ?? ""}
+                onChange={(e) => setEdit({ ...edit, max_uses: e.target.value ? Number(e.target.value) : null })}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Berlaku sampai (kosongkan = selamanya)</Label>
+              <Input
+                type="date"
+                value={edit?.expires_at ?? ""}
+                onChange={(e) => setEdit({ ...edit, expires_at: e.target.value })}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={edit?.is_active ?? true} onCheckedChange={(v) => setEdit({ ...edit, is_active: v })} />
+              <Label>Aktif</Label>
+            </div>
+            <Button className="w-full" onClick={save}>
+              Simpan
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+const SETTING_FIELDS = [
+  { key: "site_name", label: "Nama Website / Brand (mis. PadatIlmu)" },
+  { key: "admin_whatsapp", label: "Nomor WhatsApp admin (mis. 62881022392900)" },
+  { key: "bank_name", label: "Nama bank (mis. BCA)" },
+  { key: "bank_number", label: "Nomor rekening" },
+  { key: "bank_holder", label: "Atas nama rekening" },
+] as const;
+
+function Pengaturan() {
+  const qc = useQueryClient();
+  const [vals, setVals] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const { data } = useQuery({
+    queryKey: ["admin-settings"],
+    queryFn: async () => {
+      const { data } = await supabase.from("settings").select("*");
+      const map: Record<string, string> = {};
+      for (const row of data ?? []) map[row.key] = row.value;
+      return map;
+    },
+  });
+
+  useEffect(() => {
+    if (data) setVals(data);
+  }, [data]);
+
+  async function saveSettings() {
+    setBusy(true);
+    for (const f of SETTING_FIELDS) {
+      const { error } = await supabase.from("settings").upsert({ key: f.key, value: vals[f.key] ?? "" });
+      if (error) {
+        setBusy(false);
+        toast.error(error.message);
+        return;
+      }
+    }
+    setBusy(false);
+    toast.success("Pengaturan disimpan.");
+    qc.invalidateQueries({ queryKey: ["settings"] });
+    qc.invalidateQueries({ queryKey: ["admin-settings"] });
+  }
+
+  async function uploadLogo(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Ukuran logo maksimal 2 MB.");
+      return;
+    }
+    setBusy(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result as string;
+      const { error } = await supabase.from("settings").upsert({ key: "logo_url", value: base64 });
+      setBusy(false);
+      if (error) {
+        toast.error("Gagal mengunggah logo: " + error.message);
+        return;
+      }
+      toast.success("Logo berhasil diperbarui.");
+      qc.invalidateQueries({ queryKey: ["settings"] });
+      qc.invalidateQueries({ queryKey: ["admin-settings"] });
+    };
+    reader.onerror = () => {
+      setBusy(false);
+      toast.error("Gagal membaca file gambar.");
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }
+
+  async function removeLogo() {
+    setBusy(true);
+    const { error } = await supabase.from("settings").upsert({ key: "logo_url", value: "" });
+    setBusy(false);
+    if (error) {
+      toast.error("Gagal menghapus logo: " + error.message);
+      return;
+    }
+    toast.success("Logo dihapus (kembali ke ikon default).");
+    qc.invalidateQueries({ queryKey: ["settings"] });
+    qc.invalidateQueries({ queryKey: ["admin-settings"] });
+  }
+
+  async function uploadQris(file: File) {
+    setBusy(true);
+    const path = `qris/qris-${Date.now()}-${file.name}`;
+    const up = await supabase.storage.from("payment-proofs").upload(path, file, { upsert: true });
+    if (up.error) {
+      setBusy(false);
+      toast.error("Gagal mengunggah: " + up.error.message);
+      return;
+    }
+    const { error } = await supabase.from("settings").upsert({ key: "qris_image_url", value: path });
+    setBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Gambar QRIS diperbarui.");
+    qc.invalidateQueries();
+  }
+
+  return (
+    <div className="mt-4 space-y-4">
+      {SETTING_FIELDS.map((f) => (
+        <div key={f.key} className="space-y-1">
+          <Label>{f.label}</Label>
+          <Input
+            value={vals[f.key] ?? ""}
+            placeholder={f.key === "site_name" ? "PadatIlmu" : ""}
+            onChange={(e) => setVals({ ...vals, [f.key]: e.target.value })}
+          />
+        </div>
+      ))}
+      <Button onClick={saveSettings} disabled={busy}>
+        Simpan pengaturan
+      </Button>
+
+      {/* Bagian Upload Logo */}
+      <div className="rounded-2xl border border-dashed p-4">
+        <Label htmlFor="logo-input" className="flex cursor-pointer flex-col items-center gap-2 py-2 text-center">
+          <span className="font-semibold">Unggah Logo Website</span>
+          <span className="text-xs text-muted-foreground">Format PNG, JPG, atau SVG (maks 2 MB)</span>
+        </Label>
+        <input
+          id="logo-input"
+          type="file"
+          accept="image/*"
+          className="hidden"
+          disabled={busy}
+          onChange={uploadLogo}
+        />
+        {vals["logo_url"] ? (
+          <div className="mt-3 flex flex-col items-center gap-2">
+            <img
+              src={vals["logo_url"]}
+              alt="Logo Preview"
+              className="h-10 w-auto object-contain rounded border p-1 bg-background"
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={removeLogo}
+              disabled={busy}
+              className="text-destructive text-xs hover:bg-destructive/10"
+            >
+              Hapus Logo Khusus
+            </Button>
+          </div>
+        ) : (
+          <p className="mt-1 text-center text-xs text-muted-foreground">
+            Belum ada logo khusus (menggunakan ikon bawaan & nama "{vals["site_name"] || "PadatIlmu"}").
+          </p>
+        )}
+      </div>
+
+      {/* Bagian Upload QRIS */}
+      <div className="rounded-2xl border border-dashed p-4">
+        <Label htmlFor="qris" className="flex cursor-pointer flex-col items-center gap-2 py-2 text-center">
+          <span className="font-semibold">Unggah gambar QRIS</span>
+          <span className="text-xs text-muted-foreground">Foto kode QRIS untuk halaman pembayaran (maks 5 MB)</span>
+        </Label>
+        <input
+          id="qris"
+          type="file"
+          accept="image/*"
+          className="hidden"
+          disabled={busy}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) uploadQris(f);
+            e.target.value = "";
+          }}
+        />
+        {vals["qris_image_url"] && (
+          <p className="mt-2 text-center text-xs text-muted-foreground">QRIS saat ini sudah terpasang.</p>
+        )}
+      </div>
+    </div>
+  );
+}
