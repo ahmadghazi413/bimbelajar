@@ -2,7 +2,7 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { CalendarDays, Users } from "lucide-react";
 import { subjectClassesQuery } from "@/lib/queries";
-import { rupiah } from "@/lib/format";
+import { packageUnit, rupiah } from "@/lib/format";
 import type { Tables } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/ilmu/$slug")({
@@ -65,7 +65,7 @@ function IlmuPage() {
                   <p className="text-right font-display font-semibold text-primary">
                     {c.price_prefix && <span className="mr-1 text-xs font-normal text-muted-foreground">{c.price_prefix}</span>}
                     {rupiah(c.price)}
-                    <span className="block text-xs font-normal text-muted-foreground">/bulan</span>
+                    <span className="block text-xs font-normal text-muted-foreground">/{packageUnit(c)}</span>
                   </p>
                 </Link>
               ))}
