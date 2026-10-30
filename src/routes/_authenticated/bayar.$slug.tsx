@@ -53,6 +53,10 @@ function Bayar() {
   const [stagedProof, setStagedProof] = useState<File | null>(null);
   const [voucher, setVoucher] = useState("");
   const [applied, setApplied] = useState<{ code: string; kind: string } | null>(null);
+  const [packageType, setPackageType] = useState<"monthly" | "session">("monthly");
+const [selectedSessions, setSelectedSessions] = useState<number>(8); // default 8 sesi
+const SESSION_OPTIONS = [1, 2, 4, 8, 10, 12, 16];
+
   const [useReward, setUseReward] = useState(false);
   const balance = useQuery(referralBalanceQuery(userId));
   const quote = useQuery({
@@ -72,7 +76,14 @@ function Bayar() {
     number: settings?.["bank_number"] || "1234567890",
     holder: settings?.["bank_holder"] || "Yayasan Bimbelajar",
   };
-  const finalPrice = quote.data?.final_amount ?? c.price;
+  // Jika admin mengatur harga per sesi di kelas gunakan itu, jika 0 gunakan estimasi dari harga kelas
+const sessionPrice = c.price_per_session > 0 ? c.price_per_session : Math.round(c.price / 8);
+
+const basePrice = packageType === "monthly" 
+  ? c.price 
+  : (selectedSessions * sessionPrice);
+
+const finalPrice = quote.data?.final_amount ?? basePrice;
 
   async function terapkanVoucher() {
     if (!voucher.trim() || !c) return;
@@ -88,6 +99,10 @@ function Bayar() {
   }
 
   async function daftar() {
+    package_type: packageType,
+sessions_total: packageType === "session" ? selectedSessions : 0,
+sessions_used: 0,
+
     if (!c || !canConfirmPayment(stagedProof?.name, busy) || !stagedProof) return;
     if ((!e || e.status === "rejected") && (!sender.trim() || !quote.data || quote.error || (voucher.trim() && !applied))) return;
     setBusy(true);
@@ -149,6 +164,7 @@ function Bayar() {
               <p>Alhamdulillah, pembayaran Anda sudah lunas.</p>
               <Button asChild variant="hero" className="w-full"><Link to="/kelas-saya">Buka Kelas Saya</Link></Button>
             </>
+          
           ) : (
             <>
               <TransferInfo amount={e.amount} qris={qris ?? ""} bank={bank} />
