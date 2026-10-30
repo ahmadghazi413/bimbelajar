@@ -26,3 +26,19 @@ export const STATUS_LABEL: Record<string, string> = {
   paid: "Lunas",
   rejected: "Ditolak",
 };
+
+type PackageInfo = { package_type?: string | null; package_weeks?: number | null; package_sessions?: number | null };
+
+/** Satuan paket kelas untuk dipakai setelah tanda "/": "bulan", "2 minggu", "8 sesi". */
+export function packageUnit(c: object): string {
+  const p = c as PackageInfo;
+  if (p.package_type === "session") return `${p.package_sessions && p.package_sessions > 0 ? p.package_sessions : 1} sesi`;
+  const w = p.package_weeks && p.package_weeks > 0 ? p.package_weeks : 4;
+  return w >= 4 ? "bulan" : `${w} minggu`;
+}
+
+/** Nama paket: "1 bulan", "2 minggu", "8 sesi". */
+export function packageTitle(c: object): string {
+  const u = packageUnit(c);
+  return u === "bulan" ? "1 bulan" : u;
+}
