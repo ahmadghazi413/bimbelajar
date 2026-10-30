@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Landmark, MessageCircle, QrCode, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { classDetailQuery, settingsQuery } from "@/lib/queries";
-import { rupiah } from "@/lib/format";
+import { packageTitle, rupiah } from "@/lib/format";
 import { Page, StatusBadge } from "@/components/PageTitle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,8 +34,6 @@ async function qrisUrl(path: string) {
   const { data } = await supabase.storage.from("payment-proofs").createSignedUrl(path, 3600);
   return data?.signedUrl ?? "";
 }
-
-const SESSION_OPTIONS = [1, 2, 4, 8, 10, 12, 16];
 
 function Bayar() {
   const { slug } = Route.useParams();
@@ -66,8 +64,6 @@ function Bayar() {
     },
   });
 
-  const [packageType, setPackageType] = useState<"monthly" | "session">("monthly");
-  const [selectedSessions, setSelectedSessions] = useState<number>(8);
   const [sender, setSender] = useState("");
   const [busy, setBusy] = useState(false);
   const [stagedProof, setStagedProof] = useState<File | null>(null);
@@ -94,13 +90,7 @@ function Bayar() {
     holder: settings?.["bank_holder"] || "Yayasan Bimbelajar",
   };
 
-  const classExtra = c as typeof c & { price_per_session?: number | null };
-  const sessionPrice =
-    classExtra.price_per_session && classExtra.price_per_session > 0
-      ? classExtra.price_per_session
-      : Math.round(c.price / 8);
-
-  const basePrice = packageType === "monthly" ? c.price : selectedSessions * sessionPrice;
+  const basePrice = c.price;
 
   const discountAmount = quote.data?.discount ?? 0;
   const rewardAmount = useReward ? (quote.data?.reward_used ?? 0) : 0;
@@ -148,9 +138,6 @@ function Bayar() {
             voucher_code: applied?.kind === "voucher" ? applied.code : null,
             referral_code: applied?.kind === "referral" ? applied.code : null,
             use_referral_reward: useReward,
-            package_type: packageType,
-            sessions_total: packageType === "session" ? selectedSessions : 0,
-            sessions_used: 0,
           } as any)
           .select("*")
           .single();
@@ -254,53 +241,12 @@ function Bayar() {
             <p className="text-destructive">Pembayaran sebelumnya ditolak. Silakan daftar ulang.</p>
           )}
 
-          {/* Pilihan Paket Bulanan / Per Sesi */}
-          <div className="space-y-3">
-            <Label className="text-base font-semibold">Pilih Paket Belajar</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant={packageType === "monthly" ? "hero" : "outline"}
-                onClick={() => setPackageType("monthly")}
-                className="h-12 flex-col gap-0.5 py-1"
-              >
-                <span className="font-semibold">Bulanan</span>
-                <span className="text-xs opacity-90">{rupiah(c.price)} / bln</span>
-              </Button>
-              <Button
-                type="button"
-                variant={packageType === "session" ? "hero" : "outline"}
-                onClick={() => setPackageType("session")}
-                className="h-12 flex-col gap-0.5 py-1"
-              >
-                <span className="font-semibold">Per Sesi</span>
-                <span className="text-xs opacity-90">{rupiah(sessionPrice)} / sesi</span>
-              </Button>
+          <div className="flex items-center justify-between rounded-2xl bg-secondary/50 p-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Paket belajar</p>
+              <p className="font-semibold">{packageTitle(c)}</p>
             </div>
-
-            {packageType === "session" && (
-              <div className="space-y-2 rounded-2xl bg-secondary/50 p-4">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Pilih Jumlah Sesi:</Label>
-                  <span className="text-sm font-semibold text-primary">
-                    {selectedSessions} Sesi = {rupiah(selectedSessions * sessionPrice)}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {SESSION_OPTIONS.map((count) => (
-                    <Button
-                      key={count}
-                      type="button"
-                      size="sm"
-                      variant={selectedSessions === count ? "hero" : "outline"}
-                      onClick={() => setSelectedSessions(count)}
-                    >
-                      {count} Sesi
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
+            <p className="font-display text-lg font-semibold text-primary">{rupiah(c.price)}</p>
           </div>
 
           <div className="space-y-2">
