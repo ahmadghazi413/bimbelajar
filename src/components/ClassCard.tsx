@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { CalendarDays, GraduationCap, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { rupiah } from "@/lib/format";
+import { packageUnit, rupiah } from "@/lib/format";
 import type { Tables } from "@/integrations/supabase/types";
 
 export function ClassCard({ c }: { c: Tables<"classes"> }) {
@@ -17,7 +17,7 @@ export function ClassCard({ c }: { c: Tables<"classes"> }) {
       <div className="mt-5 flex items-end gap-1">
         {c.price_prefix && <span className="text-sm text-muted-foreground">{c.price_prefix}</span>}
         <span className="font-display text-3xl font-semibold">{rupiah(c.price)}</span>
-        <span className="text-sm text-muted-foreground">/bulan</span>
+        <span className="text-sm text-muted-foreground">/{packageUnit(c)}</span>
       </div>
       <Button asChild className="mt-5"><Link to="/kelas/$slug" params={{ slug: c.slug }}>Lihat Detail</Link></Button>
     </div>
