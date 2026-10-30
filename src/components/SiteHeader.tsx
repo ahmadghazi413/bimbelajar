@@ -72,7 +72,6 @@ export function SiteHeader() {
               {session ? (
                 <>
                   <Link to="/kelas-saya" className={item}>Kelas Saya</Link>
-                  <Link to="/video" className={item}>Riwayat Video</Link>
                   <Link to="/pembayaran" className={item}>Riwayat Pembayaran</Link>
                   <Link to="/profil" className={item}>Profil</Link>
                   {isAdmin && <Link to="/admin" className={`${item} text-primary font-semibold`}>Panel Admin</Link>}
