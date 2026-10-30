@@ -5,6 +5,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Page, StatusBadge } from "@/components/PageTitle";
 import { Button } from "@/components/ui/button";
 import { SessionList } from "@/components/SessionList";
+import { settingsQuery } from "@/lib/queries";
+import { packageEnd, daysLeft } from "@/lib/notifications";
+import { packageTitle, tanggal } from "@/lib/format";
 
 export const Route = createFileRoute("/_authenticated/kelas-saya")({
   head: () => ({ meta: [{ title: "Kelas Saya — Bimbelajar" }, { name: "description", content: "Kelas ngaji yang Anda ikuti, jadwal dan akses belajar Bimbelajar." }, { property: "og:title", content: "Kelas Saya — Bimbelajar" }, { property: "og:description", content: "Kelas ngaji yang Anda ikuti, jadwal dan akses belajar Bimbelajar." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
@@ -25,8 +28,46 @@ function getPackageAlert(enrollment: any) {
   return null;
 }
 
+function PackageStatus({ e, className, wa }: { e: any; className: string; wa: string }) {
+  const end = packageEnd(e);
+  const renew = `${wa}?text=${encodeURIComponent(`Halo admin, saya ingin memperpanjang paket kelas ${className}.`)}`;
+  if (!end) {
+    const total = e.sessions_total || 0;
+    const used = e.sessions_used || 0;
+    const sisa = Math.max(total - used, 0);
+    return (
+      <div className="mt-4 rounded-2xl bg-secondary/50 p-4 text-sm">
+        <p className="font-semibold">Paket {total} sesi</p>
+        {used > 0 && <p className="text-muted-foreground">Sisa {sisa} sesi</p>}
+      </div>
+    );
+  }
+  const d = daysLeft(end);
+  const tone = d <= 0 ? "bg-destructive text-destructive-foreground" : d <= 7 ? "bg-warning text-warning-foreground" : "bg-secondary/50";
+  return (
+    <div className={`mt-4 rounded-2xl p-4 text-sm ${tone}`}>
+      <p className="font-semibold">Paket {packageTitle(e)}</p>
+      <p>
+        {d <= 0 ? "Paket sudah habis" : `Sisa ${d} hari`} · berlaku sampai {tanggal(end.toISOString())}
+      </p>
+      {d <= 7 && (
+        <p className="mt-1 font-semibold">
+          {d <= 0 ? "Perpanjang paket agar bisa belajar lagi." : "Paket Anda hampir habis, segera perpanjang."}
+        </p>
+      )}
+      {d <= 7 && (
+        <Button asChild variant="outline" size="sm" className="mt-3 text-foreground">
+          <a href={renew} target="_blank" rel="noreferrer">Perpanjang lewat WhatsApp</a>
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function KelasSaya() {
   const { userId } = Route.useRouteContext();
+  const { data: settings } = useQuery(settingsQuery);
+  const waBase = `https://wa.me/${settings?.["admin_whatsapp"] || "62881022392900"}`;
   const { data, isLoading } = useQuery({
     queryKey: ["kelas-saya", userId],
     queryFn: async () => {
@@ -62,6 +103,7 @@ function KelasSaya() {
               <p className="mt-2 flex items-center gap-2 text-muted-foreground"><CalendarDays className="h-4 w-4" /> {c.schedule}</p>
               {e.status === "paid" ? (
                 <>
+                  <PackageStatus e={e} className={c.name} wa={waBase} />
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     {p?.whatsapp_link && <Button asChild variant="success" size="lg"><a href={p.whatsapp_link} target="_blank" rel="noreferrer"><MessageCircle /> Gabung Grup WhatsApp</a></Button>}
                     {p?.zoom_link && <Button asChild variant="hero" size="lg"><a href={p.zoom_link} target="_blank" rel="noreferrer"><VideoIcon /> Masuk Zoom</a></Button>}
