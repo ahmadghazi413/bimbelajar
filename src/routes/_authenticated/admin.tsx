@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { useAuth } from "@/lib/auth";
-import { rupiah, tanggal } from "@/lib/format";
+import { packageUnit, rupiah, tanggal } from "@/lib/format";
 import { Page, StatusBadge } from "@/components/PageTitle";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -145,7 +145,9 @@ function Dashboard() {
 type ClassForm = Partial<Tables<"classes">> & {
   whatsapp_link?: string;
   zoom_link?: string;
-  price_per_session?: number | null;
+  package_type?: string;
+  package_weeks?: number;
+  package_sessions?: number;
 };
 
 function KelolaKelas() {
@@ -172,7 +174,9 @@ function KelolaKelas() {
       price: Number(rest.price ?? 0),
       price_prefix: rest.price_prefix ?? "",
       is_active: rest.is_active ?? true,
-      price_per_session: rest.price_per_session ? Number(rest.price_per_session) : null,
+      package_type: rest.package_type === "session" ? "session" : "monthly",
+      package_weeks: rest.package_type === "session" ? 4 : Number(rest.package_weeks || 4),
+      package_sessions: rest.package_type === "session" ? Number(rest.package_sessions || 1) : 0,
       sort_order: rest.sort_order ?? 99,
       subject_id: edit.subject_id,
       level_number: Number(rest.level_number ?? 1),
@@ -209,11 +213,10 @@ function KelolaKelas() {
 
   return (
     <div className="mt-4 space-y-3">
-      <Button onClick={() => setEdit({ is_active: true, level_number: 1, level_label: "Baru Belajar" })}>
+      <Button onClick={() => setEdit({ is_active: true, level_number: 1, level_label: "Baru Belajar", package_type: "monthly", package_weeks: 4, package_sessions: 0 })}>
         + Tambah kelas
       </Button>
       {data?.map((c) => {
-        const extra = c as typeof c & { price_per_session?: number | null };
         return (
           <div key={c.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4">
             <div>
@@ -221,8 +224,7 @@ function KelolaKelas() {
                 {classLevelName(c)} {!c.is_active && <span className="text-xs text-muted-foreground">(nonaktif)</span>}
               </p>
               <p className="text-sm text-muted-foreground">
-                {c.price_prefix} {rupiah(c.price)} / bln
-                {extra.price_per_session ? ` · ${rupiah(extra.price_per_session)} / sesi` : " · (sesi: otomatis)"}
+                {c.price_prefix} {rupiah(c.price)} / {packageUnit(c)}
                 {" · kuota "}
                 {c.quota}
               </p>
@@ -236,7 +238,6 @@ function KelolaKelas() {
                     ...c,
                     whatsapp_link: c.class_private?.whatsapp_link ?? "",
                     zoom_link: c.class_private?.zoom_link ?? "",
-                    price_per_session: extra.price_per_session ?? null,
                   })
                 }
               >
@@ -276,8 +277,60 @@ function KelolaKelas() {
             {f("schedule", "Jadwal")}
             {f("quota", "Kuota", "number")}
             {f("price_prefix", "Awalan harga (mis. Mulai)")}
-            {f("price", "Harga per bulan (Rp)", "number")}
-            {f("price_per_session", "Harga per sesi (Rp — opsional, kosongkan jika otomatis dibagi 8)", "number")}
+            {f("price", "Harga paket (Rp)", "number")}
+            <div className="space-y-1">
+              <Label>Jenis paket</Label>
+              <Select
+                value={edit?.package_type === "session" ? "session" : "monthly"}
+                onValueChange={(v) => setEdit({ ...edit, package_type: v })}
+              >
+                <SelectTrigger aria-label="Jenis paket">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="monthly">Bulanan</SelectItem>
+                  <SelectItem value="session">Per sesi</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {edit?.package_type === "session" ? (
+              <div className="space-y-1">
+                <Label>Jumlah sesi</Label>
+                <Select
+                  value={String(edit?.package_sessions || 1)}
+                  onValueChange={(v) => setEdit({ ...edit, package_sessions: Number(v) })}
+                >
+                  <SelectTrigger aria-label="Jumlah sesi">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 30 }, (_, i) => i + 1).map((n) => (
+                      <SelectItem key={n} value={String(n)}>
+                        {n} sesi
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <Label>Durasi</Label>
+                <Select
+                  value={String(edit?.package_weeks || 4)}
+                  onValueChange={(v) => setEdit({ ...edit, package_weeks: Number(v) })}
+                >
+                  <SelectTrigger aria-label="Durasi">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1 minggu</SelectItem>
+                    <SelectItem value="2">2 minggu</SelectItem>
+                    <SelectItem value="3">3 minggu</SelectItem>
+                    <SelectItem value="4">1 bulan</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             {f("whatsapp_link", "Link grup WhatsApp")}
             {f("zoom_link", "Link Zoom")}
             <div className="flex items-center gap-2">
@@ -510,7 +563,7 @@ function Peserta() {
       <p className="text-sm text-muted-foreground">{data?.filter((x) => x.status === "paid").length ?? 0} peserta lunas</p>
       {data?.length === 0 && <p className="text-muted-foreground">Belum ada pendaftar.</p>}
       {data?.map((x) => {
-        const extraEnr = x as typeof x & { package_type?: string; sessions_total?: number };
+        const extraEnr = x as typeof x & { package_type?: string; sessions_total?: number; package_weeks?: number };
         return (
           <div key={x.id} className="space-y-2 rounded-2xl border bg-card p-4">
             <div className="flex items-start justify-between gap-2">
@@ -524,7 +577,7 @@ function Peserta() {
                   {x.sender_name ? ` · a.n. ${x.sender_name}` : ""}
                 </p>
                 <p className="text-xs font-semibold text-primary">
-                  Paket: {extraEnr.package_type === "session" ? `Per Sesi (${extraEnr.sessions_total || 0} Sesi)` : "Bulanan"}
+                  Paket: {extraEnr.package_type === "session" ? `Per Sesi (${extraEnr.sessions_total || 0} Sesi)` : `Bulanan (${(extraEnr.package_weeks || 4) >= 4 ? "1 bulan" : `${extraEnr.package_weeks} minggu`})`}
                 </p>
               </div>
               <StatusBadge status={x.status} />
