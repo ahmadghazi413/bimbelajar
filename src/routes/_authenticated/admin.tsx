@@ -19,6 +19,7 @@ import { AdminDelete } from "@/components/AdminDelete";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { classesInSubject, classLevelName } from "@/lib/class-management";
 import { PaymentProof } from "@/components/PaymentProof";
+import { FILE_MAX_BYTES, fileExt, openPrivateFile } from "@/lib/session-content";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
@@ -477,7 +478,17 @@ function KelolaSesi() {
       const { data: s, error } = await supabase.from("class_sessions").select("*").eq("class_id", classId).order("level").order("number");
       if (error) throw error;
       const { data: r } = await supabase.from("session_recordings").select("*").eq("class_id", classId);
-      return (s ?? []).map((x) => ({ ...x, video_url: r?.find((y) => y.session_id === x.id)?.video_url ?? "" }));
+      const { data: pv } = await (supabase as any).from("session_private").select("*").eq("class_id", classId);
+      return (s ?? []).map((x) => {
+        const priv = (pv ?? []).find((y: any) => y.session_id === x.id);
+        return {
+          ...x,
+          video_url: r?.find((y) => y.session_id === x.id)?.video_url ?? "",
+          zoom_link: (priv?.zoom_link ?? "") as string,
+          material_path: (priv?.material_path ?? "") as string,
+          material_name: (priv?.material_name ?? "") as string,
+        };
+      });
     },
   });
 
@@ -529,12 +540,65 @@ function SessionRow({
   classId,
   onSaved,
 }: {
-  s: Tables<"class_sessions"> & { video_url: string };
+  s: Tables<"class_sessions"> & { video_url: string; zoom_link: string; material_path: string; material_name: string };
   classId: string;
   onSaved: () => Promise<void>;
 }) {
   const [v, setV] = useState(s);
+  const [busyFile, setBusyFile] = useState(false);
   const qc = useQueryClient();
+
+  async function uploadMaterial(file: File) {
+    if (fileExt(file.name) !== "pdf") {
+      toast.error("Materi harus berupa file PDF.");
+      return;
+    }
+    if (file.size === 0 || file.size > FILE_MAX_BYTES) {
+      toast.error("Ukuran PDF maksimal 20 MB.");
+      return;
+    }
+    setBusyFile(true);
+    const path = `${classId}/${s.id}/${crypto.randomUUID()}.pdf`;
+    const up = await supabase.storage.from("session-materials").upload(path, file, { contentType: "application/pdf" });
+    if (up.error) {
+      toast.error(up.error.message);
+      setBusyFile(false);
+      return;
+    }
+    const r = await (supabase as any)
+      .from("session_private")
+      .upsert({ session_id: s.id, class_id: classId, material_path: path, material_name: file.name.slice(0, 200) });
+    if (r.error) {
+      await supabase.storage.from("session-materials").remove([path]);
+      toast.error(r.error.message);
+      setBusyFile(false);
+      return;
+    }
+    if (v.material_path) await supabase.storage.from("session-materials").remove([v.material_path]);
+    setV((cur) => ({ ...cur, material_path: path, material_name: file.name }));
+    toast.success("Materi PDF tersimpan.");
+    setBusyFile(false);
+    qc.invalidateQueries();
+  }
+
+  async function removeMaterial() {
+    if (!v.material_path) return;
+    setBusyFile(true);
+    const r = await (supabase as any)
+      .from("session_private")
+      .upsert({ session_id: s.id, class_id: classId, material_path: "", material_name: "" });
+    if (r.error) {
+      toast.error(r.error.message);
+      setBusyFile(false);
+      return;
+    }
+    await supabase.storage.from("session-materials").remove([v.material_path]);
+    setV((cur) => ({ ...cur, material_path: "", material_name: "" }));
+    toast.success("Materi PDF dihapus.");
+    setBusyFile(false);
+    qc.invalidateQueries();
+  }
+
   async function save() {
     const { error } = await supabase
       .from("class_sessions")
@@ -556,6 +620,15 @@ function SessionRow({
     if (r.error) {
       toast.error(r.error.message);
       return;
+    }
+    if ((v.zoom_link ?? "").trim() !== (s.zoom_link ?? "")) {
+      const z = await (supabase as any)
+        .from("session_private")
+        .upsert({ session_id: s.id, class_id: classId, zoom_link: (v.zoom_link ?? "").trim() });
+      if (z.error) {
+        toast.error(z.error.message);
+        return;
+      }
     }
     const published = await supabase.from("class_sessions").update({ is_published: v.is_published }).eq("id", s.id);
     if (published.error) {
@@ -594,6 +667,40 @@ function SessionRow({
           onChange={(e) => setV({ ...v, video_url: e.target.value })}
           placeholder="https://youtu.be/..."
         />
+        <Label>Link Zoom sesi ini (beda tiap pertemuan)</Label>
+        <Input
+          value={v.zoom_link ?? ""}
+          onChange={(e) => setV({ ...v, zoom_link: e.target.value })}
+          placeholder="https://zoom.us/j/..."
+        />
+        <Label>Materi PDF sesi ini</Label>
+        {v.material_path ? (
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <span className="break-all">{v.material_name || "materi.pdf"}</span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => openPrivateFile("session-materials", v.material_path).catch((e) => toast.error(e.message))}
+            >
+              Buka
+            </Button>
+            <Button size="sm" variant="outline" disabled={busyFile} onClick={removeMaterial}>
+              Hapus
+            </Button>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Belum ada PDF.</p>
+        )}
+        <Input
+          type="file"
+          accept="application/pdf,.pdf"
+          disabled={busyFile}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) uploadMaterial(f);
+          }}
+        />
         <div className="flex items-center gap-2">
           <Switch
             id={`publish-${s.id}`}
@@ -606,6 +713,7 @@ function SessionRow({
           <Button size="sm" onClick={save}>
             {v.is_published ? "Simpan dan terbitkan" : "Simpan draf"}
           </Button>
+          <SessionGrades sessionId={s.id} classId={classId} label={`Sesi ${s.number}: ${s.title}`} />
           <AdminDelete
             name={`sesi ${s.number}`}
             description="Sesi dan link rekamannya akan dihapus permanen."
@@ -619,6 +727,129 @@ function SessionRow({
         </div>
       </div>
     </details>
+  );
+}
+
+function SessionGrades({ sessionId, classId, label }: { sessionId: string; classId: string; label: string }) {
+  const [open, setOpen] = useState(false);
+  const { data, refetch } = useQuery({
+    queryKey: ["admin-grades", sessionId],
+    enabled: open,
+    queryFn: async () => {
+      const sb = supabase as any;
+      const { data: enr } = await supabase.from("enrollments").select("user_id").eq("class_id", classId).eq("status", "paid");
+      const ids = [...new Set((enr ?? []).map((x) => x.user_id))];
+      const { data: p } = ids.length ? await supabase.from("profiles").select("id, full_name").in("id", ids) : { data: [] };
+      const [sub, res] = await Promise.all([
+        sb.from("session_submissions").select("*").eq("session_id", sessionId),
+        sb.from("session_results").select("*").eq("session_id", sessionId),
+      ]);
+      return ids
+        .map((id) => ({
+          user_id: id,
+          name: p?.find((y) => y.id === id)?.full_name || "(tanpa nama)",
+          sub: (sub.data ?? []).find((x: any) => x.user_id === id),
+          res: (res.data ?? []).find((x: any) => x.user_id === id),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    },
+  });
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        Tugas &amp; nilai
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Tugas &amp; nilai · {label}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {data?.length === 0 && <p className="text-muted-foreground">Belum ada murid yang lunas di kelas ini.</p>}
+            {data?.map((row) => (
+              <GradeRow key={row.user_id} row={row} sessionId={sessionId} classId={classId} onSaved={() => refetch()} />
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function GradeRow({
+  row,
+  sessionId,
+  classId,
+  onSaved,
+}: {
+  row: { user_id: string; name: string; sub?: any; res?: any };
+  sessionId: string;
+  classId: string;
+  onSaved: () => void;
+}) {
+  const [grade, setGrade] = useState(row.res?.grade != null ? String(row.res.grade) : "");
+  const [feedback, setFeedback] = useState<string>(row.res?.feedback ?? "");
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    const n = grade.trim() === "" ? null : Number(grade);
+    if (n !== null && (!Number.isFinite(n) || n < 0 || n > 100)) {
+      toast.error("Nilai harus antara 0 sampai 100.");
+      return;
+    }
+    setBusy(true);
+    const sb = supabase as any;
+    const r =
+      n === null && !feedback.trim()
+        ? await sb.from("session_results").delete().eq("session_id", sessionId).eq("user_id", row.user_id)
+        : await sb.from("session_results").upsert({
+            session_id: sessionId,
+            user_id: row.user_id,
+            class_id: classId,
+            grade: n,
+            feedback: feedback.trim(),
+            graded_at: new Date().toISOString(),
+          });
+    setBusy(false);
+    if (r.error) {
+      toast.error(r.error.message);
+      return;
+    }
+    toast.success("Nilai disimpan.");
+    onSaved();
+  }
+
+  return (
+    <div className="space-y-2 rounded-2xl border bg-card p-3">
+      <p className="font-semibold">{row.name}</p>
+      {row.sub ? (
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="break-all">Tugas: {row.sub.file_name}</span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => openPrivateFile("assignments", row.sub.file_path).catch((e) => toast.error(e.message))}
+          >
+            Buka tugas
+          </Button>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">Belum mengirim tugas.</p>
+      )}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="space-y-1">
+          <Label>Nilai (0-100)</Label>
+          <Input type="number" min={0} max={100} value={grade} onChange={(e) => setGrade(e.target.value)} />
+        </div>
+        <div className="col-span-2 space-y-1">
+          <Label>Catatan</Label>
+          <Input value={feedback} onChange={(e) => setFeedback(e.target.value)} placeholder="Opsional" />
+        </div>
+      </div>
+      <Button size="sm" disabled={busy} onClick={save}>
+        {busy ? "Menyimpan..." : "Simpan nilai"}
+      </Button>
+    </div>
   );
 }
 
