@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { settingsQuery } from "@/lib/queries";
+import { NotificationBell } from "@/components/NotificationBell";
 
 export function SiteHeader() {
   const { session, isAdmin } = useAuth();
@@ -48,6 +49,8 @@ export function SiteHeader() {
   </span>
 </Link>
 
+        <div className="flex items-center gap-1">
+        {session && <NotificationBell />}
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" aria-label="Menu">
@@ -93,6 +96,7 @@ export function SiteHeader() {
             )}
           </SheetContent>
         </Sheet>
+        </div>
       </div>
     </header>
   );
