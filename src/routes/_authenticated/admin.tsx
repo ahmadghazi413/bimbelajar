@@ -91,6 +91,7 @@ function Admin() {
           <TabsTrigger value="ilmu">Ilmu</TabsTrigger>
           <TabsTrigger value="sesi">Sesi</TabsTrigger>
           <TabsTrigger value="peserta">Peserta</TabsTrigger>
+          <TabsTrigger value="info">Info</TabsTrigger>
           <TabsTrigger value="voucher">Voucher</TabsTrigger>
           <TabsTrigger value="referral">Referral</TabsTrigger>
           <TabsTrigger value="atur">Pengaturan</TabsTrigger>
@@ -100,11 +101,103 @@ function Admin() {
         <TabsContent value="ilmu"><KelolaIlmu /></TabsContent>
         <TabsContent value="sesi"><KelolaSesi /></TabsContent>
         <TabsContent value="peserta"><Peserta /></TabsContent>
+        <TabsContent value="info"><KelolaInfo /></TabsContent>
         <TabsContent value="voucher"><KelolaVoucher /></TabsContent>
         <TabsContent value="referral"><ReferralSettings /></TabsContent>
         <TabsContent value="atur"><Pengaturan /></TabsContent>
       </Tabs>
     </Page>
+  );
+}
+
+type InfoRow = { id: string; title: string; body: string; is_active: boolean; created_at: string };
+
+function KelolaInfo() {
+  const qc = useQueryClient();
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [busy, setBusy] = useState(false);
+  const { data } = useQuery({
+    queryKey: ["admin-announcements"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any).from("announcements").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as InfoRow[];
+    },
+  });
+
+  function refresh() {
+    qc.invalidateQueries({ queryKey: ["admin-announcements"] });
+    qc.invalidateQueries({ queryKey: ["notif-announcements"] });
+  }
+
+  async function kirim() {
+    if (!title.trim()) {
+      toast.error("Judul info wajib diisi.");
+      return;
+    }
+    setBusy(true);
+    const { error } = await (supabase as any).from("announcements").insert({ title: title.trim(), body: body.trim() });
+    setBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Info terkirim ke semua murid.");
+    setTitle("");
+    setBody("");
+    refresh();
+  }
+
+  return (
+    <div className="mt-4 space-y-4">
+      <div className="space-y-3 rounded-2xl border bg-card p-4">
+        <p className="font-semibold">Kirim info ke semua murid</p>
+        <div className="space-y-1">
+          <Label>Judul</Label>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Contoh: Kelas Jumat diundur" />
+        </div>
+        <div className="space-y-1">
+          <Label>Isi info (opsional)</Label>
+          <Textarea value={body} onChange={(e) => setBody(e.target.value)} />
+        </div>
+        <Button className="w-full" disabled={busy} onClick={kirim}>
+          {busy ? "Mengirim..." : "Kirim info"}
+        </Button>
+      </div>
+      {data?.length === 0 && <p className="text-muted-foreground">Belum ada info.</p>}
+      {data?.map((a) => (
+        <div key={a.id} className="space-y-2 rounded-2xl border bg-card p-4">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="font-semibold">{a.title}</p>
+              <p className="text-xs text-muted-foreground">{tanggal(a.created_at)}</p>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Switch
+                checked={a.is_active}
+                aria-label="Tampilkan ke murid"
+                onCheckedChange={async (v) => {
+                  const { error } = await (supabase as any).from("announcements").update({ is_active: v }).eq("id", a.id);
+                  if (error) toast.error(error.message);
+                  else refresh();
+                }}
+              />
+              <AdminDelete
+                name="info"
+                description="Info ini hilang dari notifikasi semua murid."
+                onDelete={async () => {
+                  const { error } = await (supabase as any).from("announcements").delete().eq("id", a.id);
+                  if (error) throw new Error(error.message);
+                  refresh();
+                }}
+              />
+            </div>
+          </div>
+          {a.body && <p className="whitespace-pre-line break-words text-sm text-muted-foreground">{a.body}</p>}
+        </div>
+      ))}
+    </div>
   );
 }
 
