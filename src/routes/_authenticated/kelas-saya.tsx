@@ -4,8 +4,7 @@ import { MessageCircle, Video as VideoIcon, CalendarDays } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Page, StatusBadge } from "@/components/PageTitle";
 import { Button } from "@/components/ui/button";
-import { SessionList } from "@/components/SessionList";
-import { settingsQuery } from "@/lib/queries";
+import { StudentSessions } from "@/components/StudentSessions";
 import { packageEnd, daysLeft } from "@/lib/notifications";
 import { packageTitle, tanggal } from "@/lib/format";
 
@@ -28,9 +27,8 @@ function getPackageAlert(enrollment: any) {
   return null;
 }
 
-function PackageStatus({ e, className, wa }: { e: any; className: string; wa: string }) {
+function PackageStatus({ e, slug }: { e: any; slug: string }) {
   const end = packageEnd(e);
-  const renew = `${wa}?text=${encodeURIComponent(`Halo admin, saya ingin memperpanjang paket kelas ${className}.`)}`;
   if (!end) {
     const total = e.sessions_total || 0;
     const used = e.sessions_used || 0;
@@ -50,14 +48,11 @@ function PackageStatus({ e, className, wa }: { e: any; className: string; wa: st
       <p>
         {d <= 0 ? "Paket sudah habis" : `Sisa ${d} hari`} · berlaku sampai {tanggal(end.toISOString())}
       </p>
-      {d <= 7 && (
-        <p className="mt-1 font-semibold">
-          {d <= 0 ? "Perpanjang paket agar bisa belajar lagi." : "Paket Anda hampir habis, segera perpanjang."}
-        </p>
-      )}
+      {d <= 0 && <p className="mt-1 font-semibold">Akses Zoom, grup WhatsApp, dan video ditutup. Perpanjang paket untuk membukanya lagi.</p>}
+      {d > 0 && d <= 7 && <p className="mt-1 font-semibold">Paket Anda hampir habis, segera perpanjang.</p>}
       {d <= 7 && (
         <Button asChild variant="outline" size="sm" className="mt-3 text-foreground">
-          <a href={renew} target="_blank" rel="noreferrer">Perpanjang lewat WhatsApp</a>
+          <Link to="/bayar/$slug" params={{ slug }}>Perpanjang paket</Link>
         </Button>
       )}
     </div>
@@ -66,8 +61,6 @@ function PackageStatus({ e, className, wa }: { e: any; className: string; wa: st
 
 function KelasSaya() {
   const { userId } = Route.useRouteContext();
-  const { data: settings } = useQuery(settingsQuery);
-  const waBase = `https://wa.me/${settings?.["admin_whatsapp"] || "62881022392900"}`;
   const { data, isLoading } = useQuery({
     queryKey: ["kelas-saya", userId],
     queryFn: async () => {
@@ -79,8 +72,17 @@ function KelasSaya() {
   });
 
   if (isLoading) return <Page title="Kelas Saya">Memuat...</Page>;
-  const seen = new Set<string>();
-  const list = (data?.enr ?? []).filter((e) => (seen.has(e.class_id) ? false : (seen.add(e.class_id), true)));
+  // Per kelas: utamakan pendaftaran lunas terbaru (mis. saat perpanjangan masih menunggu konfirmasi).
+  const all = data?.enr ?? [];
+  const startOf = (x: any) => x.starts_at ?? x.paid_at ?? x.created_at ?? "";
+  const picked = new Map<string, (typeof all)[number]>();
+  for (const x of all) {
+    const cur = picked.get(x.class_id);
+    if (!cur) picked.set(x.class_id, x);
+    else if (x.status === "paid" && (cur.status !== "paid" || startOf(x) > startOf(cur))) picked.set(x.class_id, x);
+  }
+  const list = [...picked.values()];
+  const renewalPending = (classId: string) => all.some((x) => x.class_id === classId && x.status === "pending");
 
   return (
     <Page title="Kelas Saya">
@@ -94,6 +96,8 @@ function KelasSaya() {
         {list.map((e) => {
           const c = e.classes!;
           const p = data!.priv.find((x) => x.class_id === e.class_id);
+          const endAt = packageEnd(e);
+          const locked = !!endAt && daysLeft(endAt) <= 0;
           return (
             <div key={e.id} className="rounded-3xl border bg-card p-6">
               <div className="flex items-start justify-between gap-2">
@@ -103,13 +107,21 @@ function KelasSaya() {
               <p className="mt-2 flex items-center gap-2 text-muted-foreground"><CalendarDays className="h-4 w-4" /> {c.schedule}</p>
               {e.status === "paid" ? (
                 <>
-                  <PackageStatus e={e} className={c.name} wa={waBase} />
+                  <PackageStatus e={e} slug={c.slug} />
+                  {renewalPending(e.class_id) && (
+                    <p className="mt-2 text-sm text-muted-foreground">Perpanjangan Anda menunggu konfirmasi admin.</p>
+                  )}
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     {p?.whatsapp_link && <Button asChild variant="success" size="lg"><a href={p.whatsapp_link} target="_blank" rel="noreferrer"><MessageCircle /> Gabung Grup WhatsApp</a></Button>}
                     {p?.zoom_link && <Button asChild variant="hero" size="lg"><a href={p.zoom_link} target="_blank" rel="noreferrer"><VideoIcon /> Masuk Zoom</a></Button>}
                   </div>
                   <h3 className="mb-3 mt-6 text-lg font-semibold">Jadwal & materi sesi</h3>
-                  <SessionList sessions={[...c.class_sessions].sort((a, b) => a.level - b.level || a.number - b.number)} />
+                  <StudentSessions
+                    classId={c.id}
+                    userId={userId}
+                    locked={locked}
+                    sessions={[...c.class_sessions].sort((a, b) => a.level - b.level || a.number - b.number)}
+                  />
                 </>
               ) : (
                 <div className="mt-4">
