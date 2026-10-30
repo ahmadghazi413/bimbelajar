@@ -2,7 +2,7 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { CalendarDays, Target, Users } from "lucide-react";
 import { classDetailQuery } from "@/lib/queries";
-import { rupiah } from "@/lib/format";
+import { packageUnit, rupiah } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/kelas/$slug")({
@@ -42,7 +42,7 @@ function Detail() {
         <p className="flex items-center gap-2"><CalendarDays className="h-5 w-5" /> {c.schedule}</p>
         <p className="flex items-center gap-2"><Users className="h-5 w-5" /> Kuota {c.quota} orang · {c.levels_label}</p>
         <p className="font-display text-2xl font-semibold">
-          {c.price_prefix} {rupiah(c.price)} <span className="font-sans text-sm font-normal">/bulan</span>
+          {c.price_prefix} {rupiah(c.price)} <span className="font-sans text-sm font-normal">/{packageUnit(c)}</span>
         </p>
       </div>
 
