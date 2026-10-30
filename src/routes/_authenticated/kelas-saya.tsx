@@ -10,6 +10,20 @@ export const Route = createFileRoute("/_authenticated/kelas-saya")({
   head: () => ({ meta: [{ title: "Kelas Saya — Bimbelajar" }, { name: "description", content: "Kelas ngaji yang Anda ikuti, jadwal dan akses belajar Bimbelajar." }, { property: "og:title", content: "Kelas Saya — Bimbelajar" }, { property: "og:description", content: "Kelas ngaji yang Anda ikuti, jadwal dan akses belajar Bimbelajar." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
   component: KelasSaya,
 });
+function getPackageAlert(enrollment: any) {
+  if (enrollment.status !== "paid") return null;
+  if (enrollment.package_type === "session") {
+    const sisa = (enrollment.sessions_total || 0) - (enrollment.sessions_used || 0);
+    if (sisa <= 2) {
+      return {
+        type: sisa <= 0 ? "danger" : "warning",
+        title: sisa <= 0 ? "Sesi Belajar Habis" : `Tersisa ${sisa} Sesi Lagi`,
+        desc: "Yuk perpanjang paket sesi agar belajar ngaji tidak terhenti.",
+      };
+    }
+  }
+  return null;
+}
 
 function KelasSaya() {
   const { userId } = Route.useRouteContext();
