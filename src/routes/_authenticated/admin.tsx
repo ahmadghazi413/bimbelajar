@@ -537,4 +537,1172 @@ function KelolaKelas() {
           whatsapp_group_link: wa,
         });
       }
-      toast.success("Kelas disim
+      toast.success("Kelas disimpan.");
+      setOpen(false);
+      qc.invalidateQueries({ queryKey: ["admin-classes"] });
+    } catch (err: any) {
+      toast.error(err.message ?? "Gagal menyimpan.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 space-y-3">
+      <Button onClick={startAdd}>+ Tambah kelas</Button>
+      <div className="divide-y rounded-2xl border">
+        {data?.map((c) => (
+          <div key={c.id} className="p-4 flex items-center justify-between gap-3">
+            <div>
+              <div className="font-semibold">{c.title}</div>
+              <div className="text-xs text-muted-foreground">
+                {rupiah(c.price)}/bln · {rupiah((c as any).price_per_session ?? Math.round(c.price / 8))}/sesi · {c.schedule_text} · {c.is_active ? "Aktif" : "Nonaktif"}
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button size="sm" variant="outline" onClick={() => startEdit(c)}>
+                Ubah
+              </Button>
+              <AdminDelete
+                table="classes"
+                id={c.id}
+                label={c.title}
+                guardMessage="Kelas yang sudah memiliki pendaftar tidak dapat dihapus."
+                onDeleted={() => qc.invalidateQueries({ queryKey: ["admin-classes"] })}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editing ? "Ubah Kelas" : "Tambah Kelas"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={save} className="space-y-3">
+            <div>
+              <Label>Judul</Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} required />
+            </div>
+            <div>
+              <Label>Slug URL</Label>
+              <Input value={slug} onChange={(e) => setSlug(e.target.value)} required />
+            </div>
+            <div>
+              <Label>Ilmu / Kategori</Label>
+              <Select value={subjectId} onValueChange={setSubjectId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih ilmu..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {subjects?.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Tingkat / Level</Label>
+              <Select value={String(levelNum)} onValueChange={(v) => setLevelNum(Number(v))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Level 1 — {classLevelName(1)}</SelectItem>
+                  <SelectItem value="2">Level 2 — {classLevelName(2)}</SelectItem>
+                  <SelectItem value="3">Level 3 — {classLevelName(3)}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Deskripsi</Label>
+              <Textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label>Harga Paket Bulanan (Rp)</Label>
+                <Input type="number" value={price} onChange={(e) => setPrice(Number(e.target.value))} required />
+              </div>
+              <div>
+                <Label>Harga Per Sesi (Rp)</Label>
+                <Input type="number" value={pricePerSession} onChange={(e) => setPricePerSession(Number(e.target.value))} required />
+              </div>
+            </div>
+            <div>
+              <Label>Jadwal</Label>
+              <Input value={schedule} onChange={(e) => setSchedule(e.target.value)} />
+            </div>
+            <div>
+              <Label>Keunggulan (satu per baris)</Label>
+              <Textarea
+                value={highlights}
+                onChange={(e) => setHighlights(e.target.value)}
+                placeholder={"Bimbingan dari nol\nRekaman bisa diulang\nKonsultasi fleksibel"}
+                rows={3}
+              />
+            </div>
+            <div>
+              <Label>Link Zoom (hanya murid lunas)</Label>
+              <Input value={zoom} onChange={(e) => setZoom(e.target.value)} placeholder="https://zoom.us/j/..." />
+            </div>
+            <div>
+              <Label>Link Grup WA (hanya murid lunas)</Label>
+              <Input value={wa} onChange={(e) => setWa(e.target.value)} placeholder="https://chat.whatsapp.com/..." />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={active} onCheckedChange={setActive} />
+              <Label>Tampilkan di katalog</Label>
+            </div>
+            <Button type="submit" disabled={busy} className="w-full">
+              {busy ? "Menyimpan..." : "Simpan"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function ClassPicker({ value, onChange, subjectId }: { value: string; onChange: (v: string) => void; subjectId?: string }) {
+  const { data: classes } = useClasses();
+  const filtered = subjectId ? classesInSubject(classes ?? [], subjectId) : classes ?? [];
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs text-muted-foreground">Pilih kelas</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger className="w-full sm:w-80">
+          <SelectValue placeholder="Pilih kelas..." />
+        </SelectTrigger>
+        <SelectContent>
+          {filtered.map((c) => (
+            <SelectItem key={c.id} value={c.id}>
+              {c.title}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function KelolaSesi() {
+  const [subjectId, setSubjectId] = useState("");
+  const [classId, setClassId] = useState("");
+  const qc = useQueryClient();
+  const { data, refetch } = useQuery({
+    queryKey: ["admin-sesi", classId],
+    enabled: !!classId,
+    queryFn: async () => {
+      const { data: s, error } = await supabase.from("class_sessions").select("*").eq("class_id", classId).order("level").order("number");
+      if (error) throw error;
+      const { data: r } = await supabase.from("session_recordings").select("*").eq("class_id", classId);
+      const { data: pv } = await (supabase as any).from("session_private").select("*").eq("class_id", classId);
+      return (s ?? []).map((x) => {
+        const priv = (pv ?? []).find((y: any) => y.session_id === x.id);
+        return {
+          ...x,
+          video_url: r?.find((y) => y.session_id === x.id)?.video_url ?? "",
+          zoom_link: (priv?.zoom_link ?? "") as string,
+          material_path: (priv?.material_path ?? "") as string,
+          material_name: (priv?.material_name ?? "") as string,
+        };
+      });
+    },
+  });
+
+  async function addSession() {
+    const last = data?.at(-1);
+    const level = last ? (last.number >= 16 ? last.level + 1 : last.level) : 1;
+    const number = last ? (last.number >= 16 ? 1 : last.number + 1) : 1;
+    const { error } = await supabase.from("class_sessions").insert({ class_id: classId, level, number, title: "Sesi baru", is_published: false });
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    await refetch();
+    qc.invalidateQueries();
+  }
+
+  return (
+    <div className="mt-4 space-y-3">
+      <SubjectPicker
+        value={subjectId}
+        onChange={(v) => {
+          setSubjectId(v);
+          setClassId("");
+        }}
+      />
+      <ClassPicker value={classId} onChange={setClassId} subjectId={subjectId} />
+      {classId && data?.length === 0 && <p className="text-muted-foreground">Belum ada sesi.</p>}
+      {data?.map((s) => (
+        <SessionRow
+          key={s.id}
+          s={s}
+          classId={classId}
+          onSaved={async () => {
+            await refetch();
+          }}
+        />
+      ))}
+      {classId && (
+        <Button variant="outline" onClick={addSession}>
+          + Tambah sesi
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function SessionRow({
+  s,
+  classId,
+  onSaved,
+}: {
+  s: {
+    id: string;
+    level: number;
+    number: number;
+    title: string;
+    description: string | null;
+    is_published: boolean;
+    video_url: string;
+    zoom_link: string;
+    material_path: string;
+    material_name: string;
+  };
+  classId: string;
+  onSaved: () => void;
+}) {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [level, setLevel] = useState(s.level);
+  const [number, setNumber] = useState(s.number);
+  const [title, setTitle] = useState(s.title);
+  const [desc, setDesc] = useState(s.description ?? "");
+  const [video, setVideo] = useState(s.video_url);
+  const [zoom, setZoom] = useState(s.zoom_link);
+  const [materialPath, setMaterialPath] = useState(s.material_path);
+  const [materialName, setMaterialName] = useState(s.material_name);
+  const [fileToUpload, setFileToUpload] = useState<File | null>(null);
+  const [published, setPublished] = useState(s.is_published);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setLevel(s.level);
+    setNumber(s.number);
+    setTitle(s.title);
+    setDesc(s.description ?? "");
+    setVideo(s.video_url);
+    setZoom(s.zoom_link);
+    setMaterialPath(s.material_path);
+    setMaterialName(s.material_name);
+    setFileToUpload(null);
+    setPublished(s.is_published);
+  }, [s]);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const { error: e1 } = await supabase
+        .from("class_sessions")
+        .update({ level: Number(level), number: Number(number), title, description: desc || null, is_published: published })
+        .eq("id", s.id);
+      if (e1) throw e1;
+
+      if (video.trim()) {
+        await supabase.from("session_recordings").upsert(
+          { session_id: s.id, class_id: classId, video_url: video.trim() },
+          { onConflict: "session_id" }
+        );
+      } else {
+        await supabase.from("session_recordings").delete().eq("session_id", s.id);
+      }
+
+      let newPath = materialPath;
+      let newName = materialName;
+
+      if (fileToUpload) {
+        if (fileToUpload.size > FILE_MAX_BYTES) {
+          throw new Error("Ukuran PDF maksimal 15MB.");
+        }
+        const ext = fileExt(fileToUpload.name);
+        const path = `materials/${classId}/${s.id}/${Date.now()}.${ext}`;
+        const { error: upErr } = await supabase.storage.from("payment_proofs").upload(path, fileToUpload, {
+          contentType: fileToUpload.type || "application/pdf",
+          upsert: true,
+        });
+        if (upErr) throw upErr;
+        newPath = path;
+        newName = fileToUpload.name;
+      }
+
+      const sb = supabase as any;
+      if (zoom.trim() || newPath) {
+        await sb.from("session_private").upsert(
+          {
+            session_id: s.id,
+            class_id: classId,
+            zoom_link: zoom.trim() || null,
+            material_path: newPath || null,
+            material_name: newName || null,
+          },
+          { onConflict: "session_id" }
+        );
+      } else {
+        await sb.from("session_private").delete().eq("session_id", s.id);
+      }
+
+      toast.success("Sesi disimpan.");
+      setOpen(false);
+      onSaved();
+      qc.invalidateQueries();
+    } catch (err: any) {
+      toast.error(err.message ?? "Gagal.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removeMaterial() {
+    if (!materialPath) return;
+    if (!confirm("Hapus file PDF dari sesi ini?")) return;
+    setBusy(true);
+    try {
+      await supabase.storage.from("payment_proofs").remove([materialPath]);
+      const sb = supabase as any;
+      if (zoom.trim()) {
+        await sb.from("session_private").update({ material_path: null, material_name: null }).eq("session_id", s.id);
+      } else {
+        await sb.from("session_private").delete().eq("session_id", s.id);
+      }
+      setMaterialPath("");
+      setMaterialName("");
+      toast.success("Materi PDF dihapus.");
+      onSaved();
+    } catch (err: any) {
+      toast.error(err.message ?? "Gagal menghapus materi.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border p-3 flex items-center justify-between gap-2">
+      <div>
+        <div className="font-semibold text-sm">
+          Level {s.level} · Sesi {s.number}: {s.title}
+        </div>
+        <div className="text-xs text-muted-foreground flex items-center gap-2 mt-0.5">
+          <span className={`px-2 py-0.2 rounded-full text-[10px] ${s.is_published ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+            {s.is_published ? "Terbit" : "Draf"}
+          </span>
+          {s.video_url && <span>• Ada rekaman</span>}
+          {s.zoom_link && <span>• Ada Zoom</span>}
+          {s.material_path && <span>• Ada PDF</span>}
+        </div>
+      </div>
+      <div className="flex items-center gap-1">
+        <SessionGrades sessionId={s.id} classId={classId} label={`Level ${s.level} · Sesi ${s.number}`} />
+        <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+          Ubah
+        </Button>
+        <AdminDelete
+          table="class_sessions"
+          id={s.id}
+          label={`Sesi ${s.number} ${s.title}`}
+          onDeleted={() => {
+            onSaved();
+            qc.invalidateQueries();
+          }}
+        />
+      </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Ubah Sesi</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={save} className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label>Level</Label>
+                <Input type="number" value={level} onChange={(e) => setLevel(Number(e.target.value))} required />
+              </div>
+              <div>
+                <Label>Nomor sesi</Label>
+                <Input type="number" value={number} onChange={(e) => setNumber(Number(e.target.value))} required />
+              </div>
+            </div>
+            <div>
+              <Label>Judul sesi</Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} required />
+            </div>
+            <div>
+              <Label>Deskripsi / Catatan ringkas</Label>
+              <Textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2} />
+            </div>
+            <div>
+              <Label>Link Rekaman YouTube</Label>
+              <Input value={video} onChange={(e) => setVideo(e.target.value)} placeholder="https://youtube.com/watch?v=..." />
+            </div>
+            <div>
+              <Label>Link Pertemuan Zoom (khusus sesi ini)</Label>
+              <Input value={zoom} onChange={(e) => setZoom(e.target.value)} placeholder="https://zoom.us/j/..." />
+            </div>
+            <div className="space-y-1.5 rounded-lg border p-2.5">
+              <Label className="text-xs font-semibold">Materi PDF / Tugas</Label>
+              {materialPath ? (
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => openPrivateFile(materialPath)}
+                    className="truncate text-primary underline hover:opacity-80"
+                  >
+                    {materialName || "Buka file PDF"}
+                  </button>
+                  <Button type="button" size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={removeMaterial}>
+                    Hapus PDF
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">Belum ada file PDF terunggah.</p>
+              )}
+              <Input
+                type="file"
+                accept="application/pdf"
+                onChange={(e) => setFileToUpload(e.target.files?.[0] ?? null)}
+              />
+              <p className="text-[10px] text-muted-foreground">Format PDF, maksimal 15MB.</p>
+            </div>
+            <div className="flex items-center gap-2 pt-2">
+              <Switch checked={published} onCheckedChange={setPublished} />
+              <Label>Publikasikan (terlihat oleh murid lunas)</Label>
+            </div>
+            <Button type="submit" disabled={busy} className="w-full">
+              {busy ? "Menyimpan..." : "Simpan Sesi"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function SessionGrades({ sessionId, classId, label }: { sessionId: string; classId: string; label: string }) {
+  const [open, setOpen] = useState(false);
+  const { data, refetch } = useQuery({
+    queryKey: ["admin-grades", sessionId],
+    enabled: open,
+    queryFn: async () => {
+      const sb = supabase as any;
+      const { data: enr } = await supabase.from("enrollments").select("user_id").eq("class_id", classId).eq("status", "paid");
+      const ids = [...new Set((enr ?? []).map((x) => x.user_id))];
+      const { data: p } = ids.length ? await supabase.from("profiles").select("id, full_name").in("id", ids) : { data: [] };
+      const [sub, res] = await Promise.all([
+        sb.from("session_submissions").select("*").eq("session_id", sessionId),
+        sb.from("session_results").select("*").eq("session_id", sessionId),
+      ]);
+      return ids
+        .map((id) => ({
+          user_id: id,
+          name: p?.find((y) => y.id === id)?.full_name || "(tanpa nama)",
+          sub: (sub.data ?? []).find((x: any) => x.user_id === id),
+          res: (res.data ?? []).find((x: any) => x.user_id === id),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    },
+  });
+  return (
+    <>
+      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+        Tugas &amp; nilai
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Tugas &amp; nilai · {label}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {data?.length === 0 && <p className="text-muted-foreground">Belum ada murid yang lunas di kelas ini.</p>}
+            {data?.map((row) => (
+              <GradeRow key={row.user_id} row={row} sessionId={sessionId} classId={classId} onSaved={() => refetch()} />
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function GradeRow({
+  row,
+  sessionId,
+  classId,
+  onSaved,
+}: {
+  row: { user_id: string; name: string; sub?: any; res?: any };
+  sessionId: string;
+  classId: string;
+  onSaved: () => void;
+}) {
+  const [grade, setGrade] = useState(row.res?.grade != null ? String(row.res.grade) : "");
+  const [feedback, setFeedback] = useState<string>(row.res?.feedback ?? "");
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    const n = grade.trim() === "" ? null : Number(grade);
+    if (n !== null && (!Number.isFinite(n) || n < 0 || n > 100)) {
+      toast.error("Nilai harus antara 0 sampai 100.");
+      return;
+    }
+    setBusy(true);
+    const sb = supabase as any;
+    const r =
+      n === null && !feedback.trim()
+        ? await sb.from("session_results").delete().eq("session_id", sessionId).eq("user_id", row.user_id)
+        : await sb.from("session_results").upsert({
+            session_id: sessionId,
+            user_id: row.user_id,
+            class_id: classId,
+            grade: n,
+            feedback: feedback.trim(),
+            graded_at: new Date().toISOString(),
+          });
+    setBusy(false);
+    if (r.error) {
+      toast.error(r.error.message);
+      return;
+    }
+    toast.success("Nilai disimpan.");
+    onSaved();
+  }
+
+  return (
+    <div className="rounded-xl border p-3 space-y-2">
+      <div className="font-semibold text-sm">{row.name}</div>
+      {row.sub ? (
+        <div className="text-xs text-muted-foreground space-y-1">
+          {row.sub.submission_url && (
+            <div>
+              Tautan:{" "}
+              <a href={row.sub.submission_url} target="_blank" rel="noreferrer" className="text-primary underline">
+                {row.sub.submission_url}
+              </a>
+            </div>
+          )}
+          {row.sub.file_path && (
+            <div>
+              <button
+                type="button"
+                onClick={() => openPrivateFile(row.sub.file_path)}
+                className="text-primary underline hover:opacity-80"
+              >
+                Unduh / Buka file tugas
+              </button>
+            </div>
+          )}
+          {row.sub.notes && <div>Catatan: {row.sub.notes}</div>}
+        </div>
+      ) : (
+        <div className="text-xs text-muted-foreground italic">Belum mengumpulkan tugas</div>
+      )}
+      <div className="grid grid-cols-3 gap-2">
+        <Input
+          type="number"
+          placeholder="Nilai (0-100)"
+          value={grade}
+          onChange={(e) => setGrade(e.target.value)}
+          className="col-span-1"
+        />
+        <Input
+          placeholder="Catatan / Feedback (Tajwid, makhraj, dll.)"
+          value={feedback}
+          onChange={(e) => setFeedback(e.target.value)}
+          className="col-span-2"
+        />
+      </div>
+      <Button size="sm" onClick={save} disabled={busy}>
+        {busy ? "Menyimpan..." : "Simpan nilai"}
+      </Button>
+    </div>
+  );
+}
+
+function Peserta() {
+  const qc = useQueryClient();
+  const [filter, setFilter] = useState<string>("all");
+  const { data } = useQuery({
+    queryKey: ["admin-peserta"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("enrollments")
+        .select("*, classes(title)")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      const ids = [...new Set((data ?? []).map((x) => x.user_id))];
+      const { data: profs } = ids.length ? await supabase.from("profiles").select("*").in("id", ids) : { data: [] };
+      return (data ?? []).map((e) => ({
+        ...e,
+        profile: profs?.find((p) => p.id === e.user_id),
+      }));
+    },
+  });
+
+  async function updateStatus(id: string, status: "paid" | "rejected") {
+    const { error } = await supabase.from("enrollments").update({ status }).eq("id", id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Status diperbarui.");
+    qc.invalidateQueries({ queryKey: ["admin-peserta"] });
+    qc.invalidateQueries({ queryKey: ["admin-dash-enr"] });
+  }
+
+  const rows = (data ?? []).filter((x) => (filter === "all" ? true : x.status === filter));
+
+  return (
+    <div className="mt-4 space-y-3">
+      <div className="flex gap-2">
+        {(["all", "pending", "paid", "rejected"] as const).map((k) => (
+          <Button key={k} size="sm" variant={filter === k ? "default" : "outline"} onClick={() => setFilter(k)}>
+            {k === "all" ? "Semua" : k === "pending" ? "Menunggu" : k === "paid" ? "Lunas" : "Ditolak"}
+          </Button>
+        ))}
+      </div>
+      <div className="divide-y rounded-2xl border">
+        {rows.length === 0 && <p className="p-4 text-sm text-muted-foreground">Belum ada pendaftar.</p>}
+        {rows.map((e) => (
+          <div key={e.id} className="p-4 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="font-semibold">{e.profile?.full_name ?? "(tanpa nama)"}</div>
+                <div className="text-xs text-muted-foreground">{e.profile?.phone ?? "-"}</div>
+                <div className="text-xs text-muted-foreground">
+                  Kelas: {e.classes?.title ?? "-"} · {tanggal(e.created_at)}
+                </div>
+                <div className="text-xs font-medium text-primary mt-1">
+                  Paket: {e.package_type === "session" ? `Per Sesi (${e.session_count ?? 8} sesi)` : "Bulanan"}
+                </div>
+              </div>
+              <div className="text-right">
+                <StatusBadge status={e.status} />
+                <div className="mt-1 font-bold">{rupiah(e.amount_paid)}</div>
+              </div>
+            </div>
+
+            <PaymentProof
+              enrollmentId={e.id}
+              proofPath={e.payment_proof_path}
+              isAdmin={true}
+              onProofRemoved={() => qc.invalidateQueries({ queryKey: ["admin-peserta"] })}
+            />
+
+            <ProgressEditor
+              profileId={e.user_id}
+              currentLevel={e.profile?.current_level ?? 1}
+              notes={e.profile?.test_notes ?? ""}
+              onSaved={() => qc.invalidateQueries({ queryKey: ["admin-peserta"] })}
+            />
+
+            {e.status === "pending" && (
+              <div className="flex gap-2 pt-2 border-t">
+                <Button size="sm" onClick={() => updateStatus(e.id, "paid")}>
+                  Konfirmasi Lunas
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => updateStatus(e.id, "rejected")}>
+                  Tolak
+                </Button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ProgressEditor({
+  profileId,
+  currentLevel,
+  notes,
+  onSaved,
+}: {
+  profileId: string;
+  currentLevel: number;
+  notes: string;
+  onSaved: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [level, setLevel] = useState(currentLevel);
+  const [text, setText] = useState(notes);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    setBusy(true);
+    const { error } = await supabase.from("profiles").update({ current_level: level, test_notes: text }).eq("id", profileId);
+    setBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Progres diperbarui.");
+    setOpen(false);
+    onSaved();
+  }
+
+  return (
+    <>
+      <Button size="sm" variant="ghost" onClick={() => setOpen(true)} className="text-xs">
+        Level {currentLevel} · Edit progres
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Catatan Progres Santri</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Level saat ini</Label>
+              <Select value={String(level)} onValueChange={(v) => setLevel(Number(v))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Level 1 — {classLevelName(1)}</SelectItem>
+                  <SelectItem value="2">Level 2 — {classLevelName(2)}</SelectItem>
+                  <SelectItem value="3">Level 3 — {classLevelName(3)}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Catatan bacaan / evaluasi</Label>
+              <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={3} />
+            </div>
+            <Button onClick={save} disabled={busy} className="w-full">
+              {busy ? "Menyimpan..." : "Simpan Progres"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function KelolaIlmu() {
+  const qc = useQueryClient();
+  const { data } = useSubjects();
+  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState<Tables<"subjects"> | null>(null);
+  const [name, setName] = useState("");
+  const [slug, setSlug] = useState("");
+  const [desc, setDesc] = useState("");
+  const [icon, setIcon] = useState("");
+  const [active, setActive] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  function startAdd() {
+    setEditing(null);
+    setName("");
+    setSlug("");
+    setDesc("");
+    setIcon("book");
+    setActive(true);
+    setOpen(true);
+  }
+
+  function startEdit(s: Tables<"subjects">) {
+    setEditing(s);
+    setName(s.name);
+    setSlug(s.slug);
+    setDesc(s.description ?? "");
+    setIcon(s.icon_name ?? "book");
+    setActive(s.is_active);
+    setOpen(true);
+  }
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    const payload = {
+      name,
+      slug,
+      description: desc || null,
+      icon_name: icon || null,
+      is_active: active,
+    };
+    try {
+      if (editing) {
+        const { error } = await supabase.from("subjects").update(payload).eq("id", editing.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("subjects").insert(payload);
+        if (error) throw error;
+      }
+      toast.success("Ilmu disimpan.");
+      setOpen(false);
+      qc.invalidateQueries({ queryKey: ["admin-subjects"] });
+    } catch (err: any) {
+      toast.error(err.message ?? "Gagal.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 space-y-3">
+      <Button onClick={startAdd}>+ Tambah ilmu</Button>
+      <div className="divide-y rounded-2xl border">
+        {data?.map((s) => (
+          <div key={s.id} className="p-4 flex items-center justify-between gap-3">
+            <div>
+              <div className="font-semibold">{s.name}</div>
+              <div className="text-xs text-muted-foreground">
+                slug: /{s.slug} · {s.is_active ? "Aktif" : "Nonaktif"}
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button size="sm" variant="outline" onClick={() => startEdit(s)}>
+                Ubah
+              </Button>
+              <AdminDelete
+                table="subjects"
+                id={s.id}
+                label={s.name}
+                guardMessage="Ilmu yang masih memiliki kelas tidak dapat dihapus."
+                onDeleted={() => qc.invalidateQueries({ queryKey: ["admin-subjects"] })}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editing ? "Ubah Ilmu" : "Tambah Ilmu"}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={save} className="space-y-3">
+            <div>
+              <Label>Nama ilmu</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} required />
+            </div>
+            <div>
+              <Label>Slug URL</Label>
+              <Input value={slug} onChange={(e) => setSlug(e.target.value)} required />
+            </div>
+            <div>
+              <Label>Deskripsi</Label>
+              <Textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={3} />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={active} onCheckedChange={setActive} />
+              <Label>Tampilkan di katalog publik</Label>
+            </div>
+            <Button type="submit" disabled={busy} className="w-full">
+              {busy ? "Menyimpan..." : "Simpan"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function KelolaVoucher() {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [code, setCode] = useState("");
+  const [discountType, setDiscountType] = useState<"percentage" | "fixed">("percentage");
+  const [discountValue, setDiscountValue] = useState(10);
+  const [maxUsage, setMaxUsage] = useState<number | undefined>(undefined);
+  const [expiresAt, setExpiresAt] = useState("");
+  const [active, setActive] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  const { data } = useQuery({
+    queryKey: ["admin-vouchers"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("vouchers").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  async function add(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    const { error } = await supabase.from("vouchers").insert({
+      code: code.trim().toUpperCase(),
+      discount_type: discountType,
+      discount_value: Number(discountValue),
+      max_usage: maxUsage ? Number(maxUsage) : null,
+      expires_at: expiresAt ? new Date(expiresAt).toISOString() : null,
+      is_active: active,
+    });
+    setBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("Voucher dibuat.");
+    setOpen(false);
+    setCode("");
+    qc.invalidateQueries({ queryKey: ["admin-vouchers"] });
+  }
+
+  async function toggle(id: string, current: boolean) {
+    const { error } = await supabase.from("vouchers").update({ is_active: !current }).eq("id", id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ["admin-vouchers"] });
+  }
+
+  async function remove(id: string) {
+    if (!confirm("Hapus voucher ini?")) return;
+    const { error } = await supabase.from("vouchers").delete().eq("id", id);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    qc.invalidateQueries({ queryKey: ["admin-vouchers"] });
+  }
+
+  return (
+    <div className="mt-4 space-y-3">
+      <Button onClick={() => setOpen(true)}>+ Buat voucher</Button>
+      <div className="divide-y rounded-2xl border">
+        {data?.length === 0 && <p className="p-4 text-sm text-muted-foreground">Belum ada voucher.</p>}
+        {data?.map((v) => (
+          <div key={v.id} className="p-4 flex items-center justify-between gap-3">
+            <div>
+              <div className="font-bold tracking-wide font-mono text-primary">{v.code}</div>
+              <div className="text-xs text-muted-foreground">
+                Diskon: {v.discount_type === "percentage" ? `${v.discount_value}%` : rupiah(v.discount_value)} · Terpakai: {v.used_count}x
+                {v.max_usage ? ` / maks ${v.max_usage}x` : ""} · {v.is_active ? "Aktif" : "Nonaktif"}
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button size="sm" variant="ghost" onClick={() => toggle(v.id, v.is_active)}>
+                {v.is_active ? "Nonaktifkan" : "Aktifkan"}
+              </Button>
+              <Button size="sm" variant="ghost" className="text-destructive" onClick={() => remove(v.id)}>
+                Hapus
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Buat Voucher Baru</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={add} className="space-y-3">
+            <div>
+              <Label>Kode Voucher</Label>
+              <Input
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                placeholder="CONTOH: NGAJIHEMAT"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label>Tipe Diskon</Label>
+                <Select value={discountType} onValueChange={(val: any) => setDiscountType(val)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="percentage">Persen (%)</SelectItem>
+                    <SelectItem value="fixed">Nominal (Rp)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Nilai Diskon</Label>
+                <Input
+                  type="number"
+                  value={discountValue}
+                  onChange={(e) => setDiscountValue(Number(e.target.value))}
+                  required
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Batas Penggunaan (opsional)</Label>
+              <Input
+                type="number"
+                placeholder="Kosongkan jika tak terbatas"
+                value={maxUsage ?? ""}
+                onChange={(e) => setMaxUsage(e.target.value ? Number(e.target.value) : undefined)}
+              />
+            </div>
+            <div>
+              <Label>Kedaluwarsa (opsional)</Label>
+              <Input type="date" value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={active} onCheckedChange={setActive} />
+              <Label>Aktifkan langsung</Label>
+            </div>
+            <Button type="submit" disabled={busy} className="w-full">
+              {busy ? "Menyimpan..." : "Buat Voucher"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function Pengaturan() {
+  const qc = useQueryClient();
+  const [vals, setVals] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState(false);
+  const { data } = useQuery({
+    queryKey: ["admin-settings"],
+    queryFn: async () => {
+      const { data } = await supabase.from("settings").select("*");
+      const map: Record<string, string> = {};
+      for (const row of data ?? []) map[row.key] = row.value;
+      return map;
+    },
+  });
+
+  useEffect(() => {
+    if (data) setVals(data);
+  }, [data]);
+
+  async function saveSettings() {
+    setBusy(true);
+    try {
+      for (const [key, value] of Object.entries(vals)) {
+        await supabase.from("settings").upsert({ key, value });
+      }
+      toast.success("Pengaturan disimpan.");
+      qc.invalidateQueries({ queryKey: ["admin-settings"] });
+      qc.invalidateQueries({ queryKey: ["settings"] });
+    } catch (err: any) {
+      toast.error(err.message ?? "Gagal menyimpan.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 1024 * 1024) {
+      toast.error("Ukuran logo maksimal 1MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const b64 = reader.result as string;
+      setVals((prev) => ({ ...prev, logo_url: b64 }));
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function handleQrisUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Ukuran QRIS maksimal 2MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const b64 = reader.result as string;
+      setVals((prev) => ({ ...prev, qris_image_url: b64 }));
+    };
+    reader.readAsDataURL(file);
+  }
+
+  return (
+    <div className="mt-4 space-y-4 max-w-lg">
+      <div>
+        <Label>Nama Platform</Label>
+        <Input
+          value={vals.site_name ?? ""}
+          onChange={(e) => setVals({ ...vals, site_name: e.target.value })}
+          placeholder="PadatIlmu"
+        />
+      </div>
+
+      <div className="space-y-2 rounded-xl border p-3">
+        <Label>Logo Header</Label>
+        {vals.logo_url && (
+          <div className="flex items-center gap-3">
+            <img src={vals.logo_url} alt="Logo" className="h-10 w-auto rounded border bg-white p-1" />
+            <Button size="sm" variant="outline" onClick={() => setVals({ ...vals, logo_url: "" })}>
+              Hapus Logo
+            </Button>
+          </div>
+        )}
+        <Input type="file" accept="image/*" onChange={handleLogoUpload} />
+      </div>
+
+      <div>
+        <Label>Nomor WhatsApp Admin (diawali 62)</Label>
+        <Input
+          value={vals.admin_whatsapp ?? ""}
+          onChange={(e) => setVals({ ...vals, admin_whatsapp: e.target.value })}
+          placeholder="6281234567890"
+        />
+      </div>
+
+      <div>
+        <Label>Nama Bank</Label>
+        <Input
+          value={vals.bank_name ?? ""}
+          onChange={(e) => setVals({ ...vals, bank_name: e.target.value })}
+          placeholder="BCA / Mandiri / BSI"
+        />
+      </div>
+
+      <div>
+        <Label>Nomor Rekening</Label>
+        <Input
+          value={vals.bank_account_number ?? ""}
+          onChange={(e) => setVals({ ...vals, bank_account_number: e.target.value })}
+        />
+      </div>
+
+      <div>
+        <Label>Atas Nama Rekening</Label>
+        <Input
+          value={vals.bank_account_holder ?? ""}
+          onChange={(e) => setVals({ ...vals, bank_account_holder: e.target.value })}
+        />
+      </div>
+
+      <div className="space-y-2 rounded-xl border p-3">
+        <Label>Foto / Gambar QRIS</Label>
+        {vals.qris_image_url && (
+          <div className="space-y-2">
+            <img src={vals.qris_image_url} alt="QRIS" className="max-h-48 rounded border object-contain" />
+            <Button size="sm" variant="outline" onClick={() => setVals({ ...vals, qris_image_url: "" })}>
+              Hapus QRIS
+            </Button>
+          </div>
+        )}
+        <Input type="file" accept="image/*" onChange={handleQrisUpload} />
+      </div>
+
+      <Button onClick={saveSettings} disabled={busy} className="w-full">
+        {busy ? "Menyimpan..." : "Simpan Pengaturan"}
+      </Button>
+    </div>
+  );
+}
