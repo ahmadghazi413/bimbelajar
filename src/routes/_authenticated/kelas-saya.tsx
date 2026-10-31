@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { MessageCircle, Video as VideoIcon, CalendarDays } from "lucide-react";
+import { MessageCircle, CalendarDays } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Page, StatusBadge } from "@/components/PageTitle";
 import { Button } from "@/components/ui/button";
@@ -111,9 +111,8 @@ function KelasSaya() {
                   {renewalPending(e.class_id) && (
                     <p className="mt-2 text-sm text-muted-foreground">Perpanjangan Anda menunggu konfirmasi admin.</p>
                   )}
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="mt-4 grid gap-3">
                     {p?.whatsapp_link && <Button asChild variant="success" size="lg"><a href={p.whatsapp_link} target="_blank" rel="noreferrer"><MessageCircle /> Gabung Grup WhatsApp</a></Button>}
-                    {p?.zoom_link && <Button asChild variant="hero" size="lg"><a href={p.zoom_link} target="_blank" rel="noreferrer"><VideoIcon /> Masuk Zoom</a></Button>}
                   </div>
                   <h3 className="mb-3 mt-6 text-lg font-semibold">Jadwal & materi sesi</h3>
                   <StudentSessions
