@@ -19,6 +19,17 @@ export function SiteHeader() {
   const siteName = settings?.["site_name"]?.trim() || "PadatIlmu";
   const logoUrl = settings?.["logo_url"] || "";
 
+  // Cek apakah akun yang login terdaftar di daftar pengajar/guru
+  const teacherList: { email: string }[] = (() => {
+    try {
+      return settings?.["teacher_list"] ? JSON.parse(settings["teacher_list"]) : [];
+    } catch {
+      return [];
+    }
+  })();
+  const userEmail = session?.user?.email?.toLowerCase();
+  const isTeacher = teacherList.some((t) => t.email?.toLowerCase() === userEmail);
+
   async function logout() {
     setOpen(false);
     await qc.cancelQueries();
@@ -58,11 +69,21 @@ export function SiteHeader() {
                 <Link to={session ? "/kelas-saya" : "/auth"} className={item}>Kelas Saya</Link>
                 <Link to={session ? "/pembayaran" : "/auth"} className={item}>Riwayat Pembayaran</Link>
                 <Link to={session ? "/profil" : "/auth"} className={item}>Profil</Link>
+
+                {/* Akses Admin */}
                 {isAdmin && (
                   <Link to="/admin" className={`${item} text-primary font-semibold bg-primary/10`}>
                     Panel Admin
                   </Link>
                 )}
+
+                {/* Akses Khusus Guru (jika bukan Admin) */}
+                {!isAdmin && isTeacher && (
+                  <Link to="/admin" className={`${item} text-primary font-semibold bg-primary/10`}>
+                    Panel Guru
+                  </Link>
+                )}
+
                 <a
                   href={settings?.["admin_whatsapp"] ? `https://wa.me/${settings["admin_whatsapp"]}` : "https://wa.me/62881022392900"}
                   target="_blank"
@@ -105,7 +126,7 @@ export function SiteHeader() {
           </Link>
         </div>
 
-        {/* SISI KANAN: Sapaan atau Lonceng Notifikasi */}
+        {/* SISI KANAN */}
         <div className="flex items-center gap-2">
           {session ? (
             <div className="flex items-center gap-2">
