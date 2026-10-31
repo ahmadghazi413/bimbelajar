@@ -18,7 +18,8 @@ import {
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { subjectsQuery } from "@/lib/queries";
-import { packageTitle, packageEnd, daysLeft, tanggal } from "@/lib/format";
+import { packageTitle, tanggal } from "@/lib/format";
+import { packageEnd, daysLeft } from "@/lib/notifications";
 
 export const Route = createFileRoute("/")({
   head: () => ({
