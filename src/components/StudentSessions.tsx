@@ -76,79 +76,91 @@ function SessionItem({
   const graded = !!res && (res.grade != null || !!res.feedback);
 
   return (
-    <li className="flex gap-3">
-      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-secondary text-sm font-semibold text-primary">{s.number}</span>
-      <div className="min-w-0 flex-1 space-y-2">
-        <div>
+    <li className="space-y-3">
+      <div className="flex gap-3">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-secondary text-sm font-semibold text-primary">{s.number}</span>
+        <div className="min-w-0 flex-1">
           <p className="font-medium">{s.title}</p>
           {s.description && <p className="text-sm text-muted-foreground">{s.description}</p>}
           {s.scheduled_at && <p className="text-xs text-primary">{s.scheduled_at}</p>}
         </div>
+      </div>
 
-        <div className="flex flex-wrap gap-2">
-          {priv?.zoom_link && (
-            <Button asChild size="sm" variant="hero">
-              <a href={priv.zoom_link} target="_blank" rel="noreferrer"><VideoIcon /> Masuk Zoom</a>
-            </Button>
-          )}
-          {priv?.material_path && (
-            <Button size="sm" variant="outline" onClick={() => open("session-materials", priv.material_path)}>
-              <FileText /> Materi PDF
-            </Button>
-          )}
-          {rec && (
-            <Button size="sm" variant="outline" onClick={() => setPlaying(!playing)}>
-              <PlayCircle /> {playing ? "Tutup rekaman" : "Tonton rekaman"}
-            </Button>
-          )}
-        </div>
-
-        {playing && rec && (embed ? (
-          <div className="aspect-video w-full overflow-hidden rounded-xl bg-foreground">
-            <iframe src={embed} title={s.title} className="h-full w-full" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen />
-          </div>
-        ) : (
-          <a href={rec.video_url} target="_blank" rel="noreferrer" className="block text-sm text-primary underline">Buka video</a>
-        ))}
-
-        <div className="space-y-2 rounded-xl bg-secondary/50 p-3 text-sm">
-          <p className="font-semibold">Tugas</p>
-          {sub ? (
-            <p className="break-all">
-              Terkirim: {sub.file_name} · {tanggal(sub.created_at)}{" "}
-              <button type="button" className="text-primary underline" onClick={() => open("assignments", sub.file_path)}>lihat</button>
-            </p>
-          ) : (
-            <p className="text-muted-foreground">Belum ada tugas yang dikirim.</p>
-          )}
-          <input
-            ref={fileRef}
-            type="file"
-            accept={SUBMISSION_ACCEPT}
-            className="hidden"
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              e.target.value = "";
-              if (f) upload(f);
-            }}
-          />
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => fileRef.current?.click()}>
-            <Upload /> {busy ? "Mengunggah..." : sub ? "Ganti file tugas" : "Upload tugas"}
+      <div className="flex flex-wrap gap-2">
+        {priv?.zoom_link && (
+          <Button asChild size="sm" variant="hero">
+            <a href={priv.zoom_link} target="_blank" rel="noreferrer"><VideoIcon /> Masuk Zoom</a>
           </Button>
-          <p className="text-xs text-muted-foreground">PDF, foto, Word, atau rekaman suara. Maksimal 20 MB.</p>
-        </div>
+        )}
+        {priv?.material_path && (
+          <Button size="sm" variant="outline" onClick={() => open("session-materials", priv.material_path)}>
+            <FileText /> Materi PDF
+          </Button>
+        )}
+        {rec && (
+          <Button size="sm" variant="outline" onClick={() => setPlaying(!playing)}>
+            <PlayCircle /> {playing ? "Tutup rekaman" : "Tonton rekaman"}
+          </Button>
+        )}
+      </div>
 
-        <div className="space-y-1 rounded-xl bg-secondary/50 p-3 text-sm">
-          <p className="font-semibold">Nilai</p>
-          {graded ? (
-            <>
-              {res!.grade != null && <p className="text-lg font-semibold text-primary">{res!.grade} / 100</p>}
-              {res!.feedback && <p className="whitespace-pre-line text-muted-foreground">{res!.feedback}</p>}
-            </>
-          ) : (
-            <p className="text-muted-foreground">Belum dinilai.</p>
-          )}
+      {playing && rec && (embed ? (
+        <div className="space-y-2">
+          {/* Lebar penuh sampai tepi kartu agar tombol layar penuh tampil di HP */}
+          <div className="-mx-4 aspect-video bg-foreground">
+            <iframe
+              src={embed}
+              title={s.title}
+              className="h-full w-full"
+              allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+              allowFullScreen
+            />
+          </div>
+          <a href={rec.video_url} target="_blank" rel="noreferrer" className="block text-sm text-primary underline">
+            Buka di aplikasi / layar penuh
+          </a>
         </div>
+      ) : (
+        <a href={rec.video_url} target="_blank" rel="noreferrer" className="block text-sm text-primary underline">Buka video</a>
+      ))}
+
+      <div className="space-y-2 rounded-xl bg-secondary/50 p-3 text-sm">
+        <p className="font-semibold">Tugas</p>
+        {sub ? (
+          <p className="break-all">
+            Terkirim: {sub.file_name} · {tanggal(sub.created_at)}{" "}
+            <button type="button" className="text-primary underline" onClick={() => open("assignments", sub.file_path)}>lihat</button>
+          </p>
+        ) : (
+          <p className="text-muted-foreground">Belum ada tugas yang dikirim.</p>
+        )}
+        <input
+          ref={fileRef}
+          type="file"
+          accept={SUBMISSION_ACCEPT}
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = "";
+            if (f) upload(f);
+          }}
+        />
+        <Button size="sm" variant="outline" disabled={busy} onClick={() => fileRef.current?.click()}>
+          <Upload /> {busy ? "Mengunggah..." : sub ? "Ganti file tugas" : "Upload tugas"}
+        </Button>
+        <p className="text-xs text-muted-foreground">PDF, foto, Word, atau rekaman suara. Maksimal 20 MB.</p>
+      </div>
+
+      <div className="space-y-1 rounded-xl bg-secondary/50 p-3 text-sm">
+        <p className="font-semibold">Nilai</p>
+        {graded ? (
+          <>
+            {res!.grade != null && <p className="text-lg font-semibold text-primary">{res!.grade} / 100</p>}
+            {res!.feedback && <p className="whitespace-pre-line text-muted-foreground">{res!.feedback}</p>}
+          </>
+        ) : (
+          <p className="text-muted-foreground">Belum dinilai.</p>
+        )}
       </div>
     </li>
   );
