@@ -16,6 +16,7 @@ export type EnrollmentRow = {
   id: string;
   class_id: string;
   paid_at?: string | null;
+  starts_at?: string | null;
   package_type?: string | null;
   package_weeks?: number | null;
   sessions_total?: number | null;
@@ -28,9 +29,10 @@ type Announcement = { id: string; title: string; body: string; created_at: strin
 const DAY_MS = 86_400_000;
 
 /** Tanggal paket bulanan berakhir. Paket per sesi tidak punya tanggal berakhir (null). */
-export function packageEnd(e: { paid_at?: string | null; package_type?: string | null; package_weeks?: number | null }): Date | null {
-  if (!e.paid_at || e.package_type === "session") return null;
-  const end = new Date(e.paid_at);
+export function packageEnd(e: { paid_at?: string | null; starts_at?: string | null; package_type?: string | null; package_weeks?: number | null }): Date | null {
+  const start = e.starts_at ?? e.paid_at;
+  if (!start || e.package_type === "session") return null;
+  const end = new Date(start);
   const weeks = e.package_weeks && e.package_weeks > 0 ? e.package_weeks : 4;
   if (weeks >= 4) end.setMonth(end.getMonth() + 1);
   else end.setDate(end.getDate() + weeks * 7);
@@ -94,7 +96,7 @@ export function buildNotifications(
   const latest = new Map<string, EnrollmentRow>();
   for (const e of enrollments) {
     const prev = latest.get(e.class_id);
-    if (!prev || (e.paid_at ?? "") > (prev.paid_at ?? "")) latest.set(e.class_id, e);
+    if (!prev || (e.starts_at ?? e.paid_at ?? "") > (prev.starts_at ?? prev.paid_at ?? "")) latest.set(e.class_id, e);
   }
 
   for (const e of latest.values()) {
@@ -110,14 +112,14 @@ export function buildNotifications(
           key: `expired:${e.id}`,
           kind: "expired",
           title: `Paket ${name} sudah habis`,
-          body: "Hubungi admin untuk memperpanjang paket belajar Anda.",
+          body: "Akses Zoom, grup, dan video ditutup. Perpanjang paket di menu Kelas Saya.",
         });
       } else if (d <= 7) {
         warnings.push({
           key: `expiring:${e.id}:${d}`,
           kind: "expiring",
           title: `Paket ${name} tinggal ${d} hari lagi`,
-          body: `Berlaku sampai ${tanggal(end.toISOString())}. Segera perpanjang agar belajar tidak terhenti.`,
+          body: `Berlaku sampai ${tanggal(end.toISOString())}. Segera perpanjang di menu Kelas Saya agar belajar tidak terhenti.`,
         });
       }
     } else if (e.package_type === "session") {
