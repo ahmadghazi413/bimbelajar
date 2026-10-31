@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { Landmark, MessageCircle, QrCode, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { classDetailQuery, settingsQuery } from "@/lib/queries";
-import { packageTitle, rupiah } from "@/lib/format";
+import { packageTitle, packageUnit, rupiah } from "@/lib/format";
+import { daysLeft, packageEnd } from "@/lib/notifications";
 import { Page, StatusBadge } from "@/components/PageTitle";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,6 +84,8 @@ function Bayar() {
 
   if (!c) return <Page title="Memuat...">{null}</Page>;
   const e = enr.data;
+  const endDate = e?.status === "paid" ? packageEnd(e as any) : null;
+  const canRenew = !!endDate && daysLeft(endDate) <= 7;
   const wa = settings?.["admin_whatsapp"] ? `https://wa.me/${settings["admin_whatsapp"]}` : "";
   const bank = {
     bank: settings?.["bank_name"] || "BCA",
@@ -119,7 +122,7 @@ function Bayar() {
   async function daftar() {
     if (!c || !canConfirmPayment(stagedProof?.name, busy) || !stagedProof) return;
     if (
-      (!e || e.status === "rejected") &&
+      (!e || e.status === "rejected" || canRenew) &&
       (!sender.trim() || !quote.data || quote.error || (voucher.trim() && !applied))
     )
       return;
@@ -172,7 +175,7 @@ function Bayar() {
   }
 
   async function uploadProof(file: File) {
-    if (e?.status === "paid" || busy) return;
+    if ((e?.status === "paid" && !canRenew) || busy) return;
     try {
       validateProof(file);
     } catch (error) {
@@ -193,13 +196,13 @@ function Bayar() {
   return (
     <Page
       title={`Daftar ${c.name} — Level ${c.level_number} ${c.level_label}`}
-      subtitle={`${c.price_prefix} ${rupiah(c.price)} / bulan`}
+      subtitle={`${c.price_prefix} ${rupiah(c.price)} / ${packageUnit(c)}`}
     >
       {enr.isPending ? (
         <p>Memuat pendaftaran...</p>
       ) : enr.error ? (
         <p className="text-destructive">Pendaftaran belum dapat dimuat. Silakan coba lagi.</p>
-      ) : e && e.status !== "rejected" ? (
+      ) : e && e.status !== "rejected" && !canRenew ? (
         <div className="space-y-4 rounded-3xl border bg-card p-6">
           <div className="flex items-center justify-between">
             <span className="font-semibold">Status</span>
@@ -237,6 +240,9 @@ function Bayar() {
         </div>
       ) : (
         <div className="space-y-4 rounded-3xl border bg-card p-6">
+          {canRenew && (
+            <p className="font-semibold text-primary">Perpanjang paket. Masa berlaku baru dimulai setelah paket saat ini berakhir.</p>
+          )}
           {e?.status === "rejected" && (
             <p className="text-destructive">Pembayaran sebelumnya ditolak. Silakan daftar ulang.</p>
           )}
