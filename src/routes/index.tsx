@@ -76,7 +76,7 @@ function IndexPage() {
   const isPremium = !!activePaidEnrollment;
   const userDisplayName =
     userData?.prof?.["full_name"] ||
-    session?.user?.user_metadata?.full_name ||
+    (session?.user?.user_metadata?.["full_name"] as string | undefined) ||
     session?.user?.email?.split("@")[0] ||
     "Ilmuwan";
 
