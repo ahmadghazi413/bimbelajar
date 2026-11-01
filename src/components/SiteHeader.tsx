@@ -70,6 +70,14 @@ export function SiteHeader() {
                 <Link to={session ? "/pembayaran" : "/auth"} className={item}>Riwayat Pembayaran</Link>
                 <Link to={session ? "/profil" : "/auth"} className={item}>Profil</Link>
 
+                <div className="pt-3 mt-3 border-t">
+                  <p className="px-4 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Informasi</p>
+                  <Link to="/faq" className={item}>FAQ</Link>
+                  <Link to="/refund" className={item}>Kebijakan Refund</Link>
+                  <Link to="/syarat-ketentuan" className={item}>Syarat &amp; Ketentuan</Link>
+                  <Link to="/kontak" className={item}>Kontak</Link>
+                </div>
+
                 {/* Akses Admin */}
                 {isAdmin && (
                   <Link to="/admin" className={`${item} text-primary font-semibold bg-primary/10`}>
