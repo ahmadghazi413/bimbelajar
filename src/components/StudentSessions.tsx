@@ -21,10 +21,10 @@ function SessionItem({
   s: Tables<"class_sessions">;
   classId: string;
   userId: string;
-  priv?: Priv;
-  rec?: Rec;
-  sub?: Sub;
-  res?: Res;
+  priv?: Priv | undefined;
+  rec?: Rec | undefined;
+  sub?: Sub | undefined;
+  res?: Res | undefined;
   onChanged: () => void;
 }) {
   const [playing, setPlaying] = useState(false);

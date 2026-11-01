@@ -6,7 +6,7 @@ const ALLOWED_EXT = SUBMISSION_ACCEPT.replace(/\./g, "").split(",");
 
 export function fileExt(name: string): string {
   const m = /\.([a-z0-9]+)$/i.exec(name);
-  return m ? m[1].toLowerCase() : "";
+  return (m?.[1] ?? "").toLowerCase();
 }
 
 export function validateSubmissionFile(file: Pick<File, "name" | "size">) {

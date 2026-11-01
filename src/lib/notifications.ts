@@ -55,8 +55,11 @@ export function classDays(schedule: string): number[] {
 
   const range = new RegExp(`(${DAY_PATTERN})\\s*(?:-|–|—|s/d|sd|sampai)\\s*(${DAY_PATTERN})`, "g");
   for (const m of text.matchAll(range)) {
-    let d = DAY_WORDS[m[1]];
-    const end = DAY_WORDS[m[2]];
+    const w1 = m[1];
+    const w2 = m[2];
+    if (!w1 || !w2) continue;
+    let d = DAY_WORDS[w1];
+    const end = DAY_WORDS[w2];
     if (d === undefined || end === undefined) continue;
     for (let i = 0; i < 7; i++) {
       days.add(d);
@@ -67,7 +70,8 @@ export function classDays(schedule: string): number[] {
 
   const words = text.replace(/[^a-z0-9' ]+/g, " ").split(/\s+/).filter(Boolean);
   words.forEach((w, i) => {
-    if (w in DAY_WORDS) days.add(DAY_WORDS[w]);
+    const dw = DAY_WORDS[w];
+    if (dw !== undefined) days.add(dw);
     if (w === "minggu") {
       const prev = words[i - 1] ?? "";
       const asWeek = /^\d+$/.test(prev) || ["setiap", "tiap", "per", "satu", "dua", "tiga", "empat"].includes(prev);

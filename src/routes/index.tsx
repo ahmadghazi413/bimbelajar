@@ -75,7 +75,7 @@ function IndexPage() {
 
   const isPremium = !!activePaidEnrollment;
   const userDisplayName =
-    userData?.prof?.full_name ||
+    userData?.prof?.["full_name"] ||
     session?.user?.user_metadata?.full_name ||
     session?.user?.email?.split("@")[0] ||
     "Ilmuwan";
@@ -206,8 +206,9 @@ function IndexPage() {
                         </p>
                       );
                     }
-                    const total = primaryEnrollment.sessions_total || 0;
-                    const used = primaryEnrollment.sessions_used || 0;
+                    const pkg = primaryEnrollment as unknown as { sessions_total?: number | null; sessions_used?: number | null };
+                    const total = pkg.sessions_total || 0;
+                    const used = pkg.sessions_used || 0;
                     return (
                       <p className="text-muted-foreground">
                         Sisa {Math.max(total - used, 0)} sesi dari total {total} sesi
