@@ -19,7 +19,8 @@ export const createIpaymuPayment = createServerFn({ method: "POST" })
   .inputValidator((d) => Input.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId, claims } = context;
-    // Enrollment is created as the user; DB triggers recompute the authoritative amount.
+
+    // Pendaftaran dibuat atas nama user yang sedang login
     const { data: enr, error } = await supabase
       .from("enrollments")
       .insert({
@@ -35,12 +36,23 @@ export const createIpaymuPayment = createServerFn({ method: "POST" })
       } as any)
       .select("id, amount, class_id")
       .single();
-    if (error || !enr) throw new Error(error?.message ?? "Pendaftaran gagal dibuat.");
 
-    const { data: cls } = await supabase.from("classes").select("title, slug").eq("id", enr.class_id).single();
+    if (error || !enr) {
+      throw new Error(error?.message ?? "Pendaftaran gagal dibuat.");
+    }
+
+    // Ambil info nama kelas & slug untuk link pengalihan
+    const { data: cls } = await supabase
+      .from("classes")
+      .select("name, slug")
+      .eq("id", enr.class_id)
+      .single();
+
     const email = (claims as any)?.email ?? "murid@padatilmu.com";
+
+    // Panggil API v2 iPaymu untuk membuat tagihan QRIS/Virtual Account
     const res = await ipaymuPost<any>("/api/v2/payment", {
-      product: [cls?.title ?? "Kelas"],
+      product: [cls?.name ?? "Kelas"],
       qty: [1],
       price: [enr.amount],
       referenceId: enr.id,
@@ -50,7 +62,11 @@ export const createIpaymuPayment = createServerFn({ method: "POST" })
       buyerName: email.split("@")[0],
       buyerEmail: email,
     });
+
     const url = res?.Data?.Url as string | undefined;
-    if (!url) throw new Error("Link pembayaran tidak tersedia.");
+    if (!url) {
+      throw new Error("Link pembayaran tidak tersedia dari iPaymu.");
+    }
+
     return { url };
   });
