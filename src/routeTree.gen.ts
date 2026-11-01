@@ -12,7 +12,11 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as FaqRouteImport } from './routes/faq'
+import { Route as KontakRouteImport } from './routes/kontak'
+import { Route as RefundRouteImport } from './routes/refund'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as SyaratKetentuanRouteImport } from './routes/syarat-ketentuan'
 import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 import { Route as AuthenticatedKelasSayaRouteImport } from './routes/_authenticated/kelas-saya'
 import { Route as AuthenticatedPembayaranRouteImport } from './routes/_authenticated/pembayaran'
@@ -37,9 +41,29 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FaqRoute = FaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KontakRoute = KontakRouteImport.update({
+  id: '/kontak',
+  path: '/kontak',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RefundRoute = RefundRouteImport.update({
+  id: '/refund',
+  path: '/refund',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SyaratKetentuanRoute = SyaratKetentuanRouteImport.update({
+  id: '/syarat-ketentuan',
+  path: '/syarat-ketentuan',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
@@ -91,7 +115,11 @@ const AuthenticatedBayarSlugRoute = AuthenticatedBayarSlugRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/faq': typeof FaqRoute
+  '/kontak': typeof KontakRoute
+  '/refund': typeof RefundRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/syarat-ketentuan': typeof SyaratKetentuanRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/kelas-saya': typeof AuthenticatedKelasSayaRoute
   '/pembayaran': typeof AuthenticatedPembayaranRoute
@@ -105,7 +133,11 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/faq': typeof FaqRoute
+  '/kontak': typeof KontakRoute
+  '/refund': typeof RefundRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/syarat-ketentuan': typeof SyaratKetentuanRoute
   '/admin': typeof AuthenticatedAdminRoute
   '/kelas-saya': typeof AuthenticatedKelasSayaRoute
   '/pembayaran': typeof AuthenticatedPembayaranRoute
@@ -121,7 +153,11 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/faq': typeof FaqRoute
+  '/kontak': typeof KontakRoute
+  '/refund': typeof RefundRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/syarat-ketentuan': typeof SyaratKetentuanRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/kelas-saya': typeof AuthenticatedKelasSayaRoute
   '/_authenticated/pembayaran': typeof AuthenticatedPembayaranRoute
@@ -137,7 +173,11 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/auth'
+    | '/faq'
+    | '/kontak'
+    | '/refund'
     | '/reset-password'
+    | '/syarat-ketentuan'
     | '/admin'
     | '/kelas-saya'
     | '/pembayaran'
@@ -151,7 +191,11 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/auth'
+    | '/faq'
+    | '/kontak'
+    | '/refund'
     | '/reset-password'
+    | '/syarat-ketentuan'
     | '/admin'
     | '/kelas-saya'
     | '/pembayaran'
@@ -166,7 +210,11 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/auth'
+    | '/faq'
+    | '/kontak'
+    | '/refund'
     | '/reset-password'
+    | '/syarat-ketentuan'
     | '/_authenticated/admin'
     | '/_authenticated/kelas-saya'
     | '/_authenticated/pembayaran'
@@ -182,7 +230,11 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
+  FaqRoute: typeof FaqRoute
+  KontakRoute: typeof KontakRoute
+  RefundRoute: typeof RefundRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  SyaratKetentuanRoute: typeof SyaratKetentuanRoute
   IlmuSlugRoute: typeof IlmuSlugRoute
   KelasSlugRoute: typeof KelasSlugRoute
   KelasIndexRoute: typeof KelasIndexRoute
@@ -211,11 +263,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/faq': {
+      id: '/faq'
+      path: '/faq'
+      fullPath: '/faq'
+      preLoaderRoute: typeof FaqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kontak': {
+      id: '/kontak'
+      path: '/kontak'
+      fullPath: '/kontak'
+      preLoaderRoute: typeof KontakRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/refund': {
+      id: '/refund'
+      path: '/refund'
+      fullPath: '/refund'
+      preLoaderRoute: typeof RefundRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reset-password': {
       id: '/reset-password'
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/syarat-ketentuan': {
+      id: '/syarat-ketentuan'
+      path: '/syarat-ketentuan'
+      fullPath: '/syarat-ketentuan'
+      preLoaderRoute: typeof SyaratKetentuanRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin': {
@@ -309,7 +389,11 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
+  FaqRoute: FaqRoute,
+  KontakRoute: KontakRoute,
+  RefundRoute: RefundRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  SyaratKetentuanRoute: SyaratKetentuanRoute,
   IlmuSlugRoute: IlmuSlugRoute,
   KelasSlugRoute: KelasSlugRoute,
   KelasIndexRoute: KelasIndexRoute,

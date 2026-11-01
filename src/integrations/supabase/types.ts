@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      announcements: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          is_active: boolean
+          title: string
+        }
+        Insert: {
+          body?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          title: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          title?: string
+        }
+        Relationships: []
+      }
       class_private: {
         Row: {
           class_id: string
@@ -85,6 +109,7 @@ export type Database = {
         Row: {
           advantages: string
           created_at: string
+          default_session_count: number
           description: string
           goals: string
           id: string
@@ -93,7 +118,11 @@ export type Database = {
           level_number: number
           levels_label: string
           name: string
+          package_sessions: number
+          package_type: string
+          package_weeks: number
           price: number
+          price_per_session: number
           price_prefix: string
           quota: number
           schedule: string
@@ -105,6 +134,7 @@ export type Database = {
         Insert: {
           advantages?: string
           created_at?: string
+          default_session_count?: number
           description?: string
           goals?: string
           id?: string
@@ -113,7 +143,11 @@ export type Database = {
           level_number?: number
           levels_label?: string
           name: string
+          package_sessions?: number
+          package_type?: string
+          package_weeks?: number
           price?: number
+          price_per_session?: number
           price_prefix?: string
           quota?: number
           schedule?: string
@@ -125,6 +159,7 @@ export type Database = {
         Update: {
           advantages?: string
           created_at?: string
+          default_session_count?: number
           description?: string
           goals?: string
           id?: string
@@ -133,7 +168,11 @@ export type Database = {
           level_number?: number
           levels_label?: string
           name?: string
+          package_sessions?: number
+          package_type?: string
+          package_weeks?: number
           price?: number
+          price_per_session?: number
           price_prefix?: string
           quota?: number
           schedule?: string
@@ -157,9 +196,12 @@ export type Database = {
           amount: number
           class_id: string
           created_at: string
+          expires_at: string | null
           id: string
           method: string
           note: string | null
+          package_type: string
+          package_weeks: number
           paid_at: string | null
           proof_url: string | null
           referral_code: string | null
@@ -167,6 +209,9 @@ export type Database = {
           referrer_id: string | null
           reward_used: number
           sender_name: string | null
+          sessions_total: number
+          sessions_used: number
+          starts_at: string | null
           status: Database["public"]["Enums"]["payment_status"]
           use_referral_reward: boolean
           user_id: string
@@ -176,9 +221,12 @@ export type Database = {
           amount: number
           class_id: string
           created_at?: string
+          expires_at?: string | null
           id?: string
           method?: string
           note?: string | null
+          package_type?: string
+          package_weeks?: number
           paid_at?: string | null
           proof_url?: string | null
           referral_code?: string | null
@@ -186,6 +234,9 @@ export type Database = {
           referrer_id?: string | null
           reward_used?: number
           sender_name?: string | null
+          sessions_total?: number
+          sessions_used?: number
+          starts_at?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           use_referral_reward?: boolean
           user_id: string
@@ -195,9 +246,12 @@ export type Database = {
           amount?: number
           class_id?: string
           created_at?: string
+          expires_at?: string | null
           id?: string
           method?: string
           note?: string | null
+          package_type?: string
+          package_weeks?: number
           paid_at?: string | null
           proof_url?: string | null
           referral_code?: string | null
@@ -205,6 +259,9 @@ export type Database = {
           referrer_id?: string | null
           reward_used?: number
           sender_name?: string | null
+          sessions_total?: number
+          sessions_used?: number
+          starts_at?: string | null
           status?: Database["public"]["Enums"]["payment_status"]
           use_referral_reward?: boolean
           user_id?: string
@@ -333,6 +390,48 @@ export type Database = {
         }
         Relationships: []
       }
+      session_private: {
+        Row: {
+          class_id: string
+          material_name: string
+          material_path: string
+          session_id: string
+          updated_at: string
+          zoom_link: string
+        }
+        Insert: {
+          class_id: string
+          material_name?: string
+          material_path?: string
+          session_id: string
+          updated_at?: string
+          zoom_link?: string
+        }
+        Update: {
+          class_id?: string
+          material_name?: string
+          material_path?: string
+          session_id?: string
+          updated_at?: string
+          zoom_link?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_private_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_private_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: true
+            referencedRelation: "class_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       session_recordings: {
         Row: {
           class_id: string
@@ -364,6 +463,90 @@ export type Database = {
             foreignKeyName: "session_recordings_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: true
+            referencedRelation: "class_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_results: {
+        Row: {
+          class_id: string
+          feedback: string
+          grade: number | null
+          graded_at: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          class_id: string
+          feedback?: string
+          grade?: number | null
+          graded_at?: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          class_id?: string
+          feedback?: string
+          grade?: number | null
+          graded_at?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_results_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_results_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "class_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_submissions: {
+        Row: {
+          class_id: string
+          created_at: string
+          file_name: string
+          file_path: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          class_id: string
+          created_at?: string
+          file_name?: string
+          file_path: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          class_id?: string
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_submissions_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_submissions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
             referencedRelation: "class_sessions"
             referencedColumns: ["id"]
           },
@@ -470,6 +653,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      class_paid_students: {
+        Args: { _class_id: string }
+        Returns: {
+          full_name: string
+          user_id: string
+        }[]
+      }
+      enrollment_end: {
+        Args: { _start: string; _type: string; _weeks: number }
+        Returns: string
+      }
       has_paid: {
         Args: { _class_id: string; _user_id: string }
         Returns: boolean
@@ -481,6 +675,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_teacher: { Args: { _class_id?: string }; Returns: boolean }
       referral_balance: { Args: { _user_id: string }; Returns: number }
       submit_proof: {
         Args: { _enrollment_id: string; _proof_url: string }
