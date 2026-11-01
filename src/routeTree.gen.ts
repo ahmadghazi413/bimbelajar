@@ -26,6 +26,7 @@ import { Route as IlmuSlugRouteImport } from './routes/ilmu/$slug'
 import { Route as KelasIndexRouteImport } from './routes/kelas/index'
 import { Route as KelasSlugRouteImport } from './routes/kelas/$slug'
 import { Route as AuthenticatedBayarSlugRouteImport } from './routes/_authenticated/bayar.$slug'
+import { Route as ApiPublicIpaymuCallbackRouteImport } from './routes/api/public/ipaymu-callback'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -111,6 +112,11 @@ const AuthenticatedBayarSlugRoute = AuthenticatedBayarSlugRouteImport.update({
   path: '/bayar/$slug',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicIpaymuCallbackRoute = ApiPublicIpaymuCallbackRouteImport.update({
+  id: '/api/public/ipaymu-callback',
+  path: '/api/public/ipaymu-callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -129,6 +135,7 @@ export interface FileRoutesByFullPath {
   '/kelas/$slug': typeof KelasSlugRoute
   '/kelas/': typeof KelasIndexRoute
   '/bayar/$slug': typeof AuthenticatedBayarSlugRoute
+  '/api/public/ipaymu-callback': typeof ApiPublicIpaymuCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -147,6 +154,7 @@ export interface FileRoutesByTo {
   '/kelas/$slug': typeof KelasSlugRoute
   '/kelas': typeof KelasIndexRoute
   '/bayar/$slug': typeof AuthenticatedBayarSlugRoute
+  '/api/public/ipaymu-callback': typeof ApiPublicIpaymuCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -167,6 +175,7 @@ export interface FileRoutesById {
   '/kelas/$slug': typeof KelasSlugRoute
   '/kelas/': typeof KelasIndexRoute
   '/_authenticated/bayar/$slug': typeof AuthenticatedBayarSlugRoute
+  '/api/public/ipaymu-callback': typeof ApiPublicIpaymuCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -187,6 +196,7 @@ export interface FileRouteTypes {
     | '/kelas/$slug'
     | '/kelas/'
     | '/bayar/$slug'
+    | '/api/public/ipaymu-callback'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -205,6 +215,7 @@ export interface FileRouteTypes {
     | '/kelas/$slug'
     | '/kelas'
     | '/bayar/$slug'
+    | '/api/public/ipaymu-callback'
   id:
     | '__root__'
     | '/'
@@ -224,6 +235,7 @@ export interface FileRouteTypes {
     | '/kelas/$slug'
     | '/kelas/'
     | '/_authenticated/bayar/$slug'
+    | '/api/public/ipaymu-callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -238,6 +250,7 @@ export interface RootRouteChildren {
   IlmuSlugRoute: typeof IlmuSlugRoute
   KelasSlugRoute: typeof KelasSlugRoute
   KelasIndexRoute: typeof KelasIndexRoute
+  ApiPublicIpaymuCallbackRoute: typeof ApiPublicIpaymuCallbackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -361,6 +374,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBayarSlugRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/ipaymu-callback': {
+      id: '/api/public/ipaymu-callback'
+      path: '/api/public/ipaymu-callback'
+      fullPath: '/api/public/ipaymu-callback'
+      preLoaderRoute: typeof ApiPublicIpaymuCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -397,6 +417,7 @@ const rootRouteChildren: RootRouteChildren = {
   IlmuSlugRoute: IlmuSlugRoute,
   KelasSlugRoute: KelasSlugRoute,
   KelasIndexRoute: KelasIndexRoute,
+  ApiPublicIpaymuCallbackRoute: ApiPublicIpaymuCallbackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
