@@ -17,7 +17,6 @@ import { canConfirmPayment, validateProof } from "@/lib/payment-proofs";
 import { PaymentProof } from "@/components/PaymentProof";
 import { createIpaymuPayment } from "@/lib/ipaymu.functions";
 
-const SESSION_OPTIONS = [1, 2, 4, 8, 10, 12, 16];
 
 export const Route = createFileRoute("/_authenticated/bayar/$slug")({
   head: () => ({
@@ -320,6 +319,14 @@ function Bayar() {
           )}
 
           {/* Pilihan Paket: Bulanan vs Per Sesi */}
+          {sessionTopUp && (
+            <div className="rounded-2xl bg-primary/10 p-4 text-sm">
+              <p className="font-semibold text-primary">Anda sudah membuka {bought} sesi. Tersisa {remaining} sesi lagi di kelas ini.</p>
+              <p className="text-muted-foreground">Pilih "{remaining} Sesi" untuk membuka semua sisa sesi sekaligus.</p>
+              <Link to="/kelas-saya" className="text-primary underline">Kembali ke Kelas Saya</Link>
+            </div>
+          )}
+          {allowed.length > 1 && (
           <div className="space-y-2">
             <Label className="font-semibold">Pilih Paket Belajar</Label>
             <div className="grid grid-cols-2 gap-2">
@@ -327,7 +334,7 @@ function Bayar() {
                 type="button"
                 onClick={() => setPackageType("monthly")}
                 className={`rounded-2xl border p-3 text-left transition ${
-                  packageType === "monthly"
+                  effType === "monthly"
                     ? "border-primary bg-primary/10 text-primary font-semibold"
                     : "border-border hover:bg-secondary"
                 }`}
@@ -340,7 +347,7 @@ function Bayar() {
                 type="button"
                 onClick={() => setPackageType("session")}
                 className={`rounded-2xl border p-3 text-left transition ${
-                  packageType === "session"
+                  effType === "session"
                     ? "border-primary bg-primary/10 text-primary font-semibold"
                     : "border-border hover:bg-secondary"
                 }`}
@@ -352,18 +359,19 @@ function Bayar() {
             </div>
           </div>
 
+          )}
           {/* Jika Paket Sesi Dipilih: Pilihan Jumlah Sesi */}
-          {packageType === "session" && (
+          {effType === "session" && (
             <div className="space-y-2 rounded-2xl bg-secondary/40 p-3">
               <Label className="text-xs font-semibold">Pilih Jumlah Pertemuan / Sesi:</Label>
               <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
-                {SESSION_OPTIONS.map((num) => (
+                {sessionOptions.map((num) => (
                   <button
                     key={num}
                     type="button"
                     onClick={() => setSelectedSessions(num)}
                     className={`rounded-xl py-2 text-xs font-bold transition border ${
-                      selectedSessions === num
+                      effSessions === num
                         ? "bg-primary text-primary-foreground border-primary shadow-sm"
                         : "bg-background border-border hover:bg-secondary"
                     }`}
@@ -373,7 +381,7 @@ function Bayar() {
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">
-                Total {selectedSessions} sesi × {rupiah(sessionPrice)} = <b>{rupiah(basePrice)}</b>
+                Total {effSessions} sesi × {rupiah(sessionPrice)} = <b>{rupiah(basePrice)}</b>
               </p>
             </div>
           )}
@@ -383,7 +391,7 @@ function Bayar() {
             <div>
               <p className="text-xs text-muted-foreground">Paket yang dipilih</p>
               <p className="font-semibold text-sm">
-                {packageType === "monthly" ? "Paket Bulanan (Akses 30 Hari)" : `Paket ${selectedSessions} Sesi Pertemuan`}
+                {effType === "monthly" ? "Paket Bulanan (Akses 30 Hari)" : `Paket ${effSessions} Sesi Pertemuan`}
               </p>
             </div>
             <p className="font-display text-lg font-bold text-primary">{rupiah(basePrice)}</p>
