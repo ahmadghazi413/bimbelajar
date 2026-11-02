@@ -81,10 +81,33 @@ function Bayar() {
 
   const balance = useQuery(referralBalanceQuery(userId));
 
+  const progress = useQuery({
+    queryKey: ["session-progress", c?.id, userId],
+    enabled: !!c,
+    queryFn: async () => {
+      const sb = supabase as any;
+      const [b, t] = await Promise.all([
+        sb.rpc("sessions_bought", { _user_id: userId, _class_id: c!.id }),
+        sb.rpc("class_session_count", { _class_id: c!.id }),
+      ]);
+      return { bought: Number(b.data ?? 0), total: Number(t.data ?? 0) };
+    },
+  });
+
   if (!c) return <Page title="Memuat...">{null}</Page>;
+  const cx = c as typeof c & { allowed_packages?: string[]; available_sessions?: number[] };
+  const allowed = cx.allowed_packages?.length ? cx.allowed_packages : ["monthly"];
+  const bought = progress.data?.bought ?? 0;
+  const remaining = Math.max((progress.data?.total ?? 0) - bought, 0);
+  const sessionOptions = [
+    ...new Set([...(cx.available_sessions ?? []), ...(bought > 0 && remaining > 0 ? [remaining] : [])]),
+  ].sort((a, b) => a - b);
+  const effType: "monthly" | "session" = allowed.includes(packageType) ? packageType : (allowed[0] as any);
+  const effSessions = sessionOptions.includes(selectedSessions) ? selectedSessions : (sessionOptions[0] ?? 0);
   const e = enr.data;
   const endDate = e?.status === "paid" ? packageEnd(e as any) : null;
-  const canRenew = !!endDate && daysLeft(endDate) <= 7;
+  const sessionTopUp = e?.status === "paid" && (e as any).package_type === "session" && bought > 0 && remaining > 0;
+  const canRenew = (!!endDate && daysLeft(endDate) <= 7) || sessionTopUp;
   const wa = settings?.["admin_whatsapp"] ? `https://wa.me/${settings["admin_whatsapp"]}` : "";
   const bank = {
     bank: settings?.["bank_name"] || "BCA",
@@ -98,7 +121,7 @@ function Bayar() {
       ? classExtra.price_per_session
       : Math.round(c.price / 8);
 
-  const basePrice = packageType === "monthly" ? c.price : sessionPrice * selectedSessions;
+  const basePrice = effType === "monthly" ? c.price : sessionPrice * effSessions;
 
   const quote = useQuery({
     queryKey: ["discount-quote", c?.id, applied?.code, useReward, userId, basePrice],
