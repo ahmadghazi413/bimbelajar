@@ -592,9 +592,37 @@ function KelolaKelas() {
             {f("description", "Deskripsi", "area")}
             {f("goals", "Tujuan", "area")}
             {f("advantages", "Keunggulan", "area")}
-            {f("level_number", "Nomor level", "number")}
-            {f("level_label", "Nama level")}
-            {f("levels_label", "Level")}
+            <div className="space-y-1">
+  <Label>Tingkat / Level Kelas</Label>
+  <Select
+    value={String(edit?.level_number ?? 1)}
+    onValueChange={(val) => {
+      const num = Number(val);
+      const labels: Record<number, string> = {
+        1: "Pemula (Dari Nol)",
+        2: "Menengah (Lancar)",
+        3: "Lanjutan (Mahir)",
+      };
+      const lbl = labels[num] || "Pemula (Dari Nol)";
+      setEdit({
+        ...edit,
+        level_number: num,
+        level_label: lbl,
+        levels_label: `Level ${num} · ${lbl}`,
+      });
+    }}
+  >
+    <SelectTrigger>
+      <SelectValue placeholder="Pilih Level" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="1">Level 1 — Pemula (Dari Nol)</SelectItem>
+      <SelectItem value="2">Level 2 — Menengah (Lancar)</SelectItem>
+      <SelectItem value="3">Level 3 — Lanjutan (Mahir)</SelectItem>
+    </SelectContent>
+  </Select>
+</div>
+
             {f("schedule", "Jadwal")}
             {f("quota", "Kuota", "number")}
             {f("price_prefix", "Awalan harga (mis. Mulai)")}
