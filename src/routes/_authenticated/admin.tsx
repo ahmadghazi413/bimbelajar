@@ -487,8 +487,7 @@ function KelolaKelas() {
       tagline: rest.tagline ?? "",
       description: rest.description ?? "",
       goals: rest.goals ?? "",
-      levels_label: rest.levels_label ?? "Level 1–2",
-      schedule: rest.schedule ?? "",
+      schedule: rest.schedule ?? "Setiap Jumat Pukul 19:30 - 21:00 WIB",
       quota: Number(rest.quota ?? 10),
       price: Number(rest.price ?? 0),
       price_prefix: rest.price_prefix ?? "",
@@ -498,10 +497,12 @@ function KelolaKelas() {
       price_per_session: Number((rest as any).price_per_session ?? 0),
       package_type: (rest as any).allowed_packages?.length === 1 && (rest as any).allowed_packages[0] === "session" ? "session" : "monthly",
       package_weeks: Number(rest.package_weeks || 4),
+      package_sessions: Number((rest as any).available_sessions?.[0] ?? 4),
       sort_order: rest.sort_order ?? 99,
       subject_id: edit.subject_id,
       level_number: Number(rest.level_number ?? 1),
-      level_label: rest.level_label ?? "Baru Belajar",
+      level_label: rest.level_label ?? "Pemula (Dari Nol)",
+      levels_label: rest.levels_label ?? `Level ${rest.level_number ?? 1} · Pemula (Dari Nol)`,
       advantages: rest.advantages ?? "",
     };
     const res = rest.id
@@ -534,31 +535,50 @@ function KelolaKelas() {
 
   return (
     <div className="mt-4 space-y-3">
-      <Button onClick={() => setEdit({ is_active: true, level_number: 1, level_label: "Baru Belajar", package_type: "monthly", package_weeks: 4, package_sessions: 0 })}>
+      <Button
+        onClick={() =>
+          setEdit({
+            is_active: true,
+            level_number: 1,
+            level_label: "Pemula (Dari Nol)",
+            levels_label: "Level 1 · Pemula (Dari Nol)",
+            package_type: "monthly",
+            package_weeks: 4,
+            package_sessions: 4,
+            schedule: "Setiap Jumat Pukul 19:30 - 21:00 WIB",
+          })
+        }
+      >
         + Tambah kelas
       </Button>
       {data?.map((c) => {
+        const pk: string[] = (c as any).allowed_packages ?? ["monthly", "session"];
+        const av: number[] = (c as any).available_sessions ?? [4, 8];
+        const descPkg = [
+          pk.includes("monthly") ? "Bulanan" : null,
+          pk.includes("session") ? `Per sesi (pilihan: ${av.join(", ")})` : null,
+        ].filter(Boolean).join(" & ");
+
         return (
-          <div key={c.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-4">
+          <div key={c.id} className="rounded-2xl border p-4 flex items-center justify-between gap-3">
             <div>
-              <p className="font-semibold">
-                {classLevelName(c)} {!c.is_active && <span className="text-xs text-muted-foreground">(nonaktif)</span>}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {c.price_prefix} {rupiah(c.price)} / {packageUnit(c)}
-                {" · kuota "}
-                {c.quota}
-              </p>
+              <div className="font-semibold text-base">{classLevelName(c)}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">
+                {rupiah(c.price)}/{packageUnit(c)} {c.price_per_session ? `· ${rupiah(c.price_per_session)}/sesi` : ""}
+              </div>
+              <div className="text-xs text-muted-foreground mt-0.5">Paket: {descPkg || "Belum diatur"}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">Jadwal: {c.schedule}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">Status: {c.is_active ? "Publik" : "Disembunyikan"}</div>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() =>
                   setEdit({
                     ...c,
-                    whatsapp_link: c.class_private?.whatsapp_link ?? "",
-                    zoom_link: c.class_private?.zoom_link ?? "",
+                    whatsapp_link: c.class_private?.[0]?.whatsapp_link ?? "",
+                    zoom_link: c.class_private?.[0]?.zoom_link ?? "",
                   })
                 }
               >
@@ -577,6 +597,7 @@ function KelolaKelas() {
           </div>
         );
       })}
+
       <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -592,41 +613,107 @@ function KelolaKelas() {
             {f("description", "Deskripsi", "area")}
             {f("goals", "Tujuan", "area")}
             {f("advantages", "Keunggulan", "area")}
-            <div className="space-y-1">
-  <Label>Tingkat / Level Kelas</Label>
-  <Select
-    value={String(edit?.level_number ?? 1)}
-    onValueChange={(val) => {
-      const num = Number(val);
-      const labels: Record<number, string> = {
-        1: "Pemula (Dari Nol)",
-        2: "Menengah (Lancar)",
-        3: "Lanjutan (Mahir)",
-      };
-      const lbl = labels[num] || "Pemula (Dari Nol)";
-      setEdit({
-        ...edit,
-        level_number: num,
-        level_label: lbl,
-        levels_label: `Level ${num} · ${lbl}`,
-      });
-    }}
-  >
-    <SelectTrigger>
-      <SelectValue placeholder="Pilih Level" />
-    </SelectTrigger>
-    <SelectContent>
-      <SelectItem value="1">Level 1 — Pemula (Dari Nol)</SelectItem>
-      <SelectItem value="2">Level 2 — Menengah (Lancar)</SelectItem>
-      <SelectItem value="3">Level 3 — Lanjutan (Mahir)</SelectItem>
-    </SelectContent>
-  </Select>
-</div>
 
-            {f("schedule", "Jadwal")}
+            {/* Tingkat Kelas: 1 Dropdown Praktis */}
+            <div className="space-y-1">
+              <Label>Tingkat / Level Kelas</Label>
+              <Select
+                value={String(edit?.level_number ?? 1)}
+                onValueChange={(val) => {
+                  const num = Number(val);
+                  const labels: Record<number, string> = {
+                    1: "Pemula (Dari Nol)",
+                    2: "Menengah (Lancar)",
+                    3: "Lanjutan (Mahir)",
+                  };
+                  const lbl = labels[num] || "Pemula (Dari Nol)";
+                  setEdit({
+                    ...edit,
+                    level_number: num,
+                    level_label: lbl,
+                    levels_label: `Level ${num} · ${lbl}`,
+                  });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih Level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Level 1 — Pemula (Dari Nol)</SelectItem>
+                  <SelectItem value="2">Level 2 — Menengah (Lancar)</SelectItem>
+                  <SelectItem value="3">Level 3 — Lanjutan (Mahir)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Jadwal Terstruktur: Hari + Jam Mulai & Selesai */}
+            <div className="space-y-2 rounded-xl border p-3 bg-muted/20">
+              <Label className="font-semibold text-sm">Jadwal Pertemuan</Label>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Hari</Label>
+                  <Select
+                    defaultValue="Jumat"
+                    onValueChange={(day) => {
+                      const cur = edit?.schedule || "Setiap Jumat Pukul 19:30 - 21:00 WIB";
+                      const match = cur.match(/Pukul\s+(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})/);
+                      const timeStr = match ? `Pukul ${match[1]} - ${match[2]} WIB` : "Pukul 19:30 - 21:00 WIB";
+                      setEdit({ ...edit, schedule: `Setiap ${day} ${timeStr}` });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Hari" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Ahad"].map((d) => (
+                        <SelectItem key={d} value={d}>Setiap {d}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Jam Mulai</Label>
+                  <Input
+                    type="time"
+                    defaultValue="19:30"
+                    onChange={(e) => {
+                      const st = e.target.value || "19:30";
+                      const cur = edit?.schedule || "Setiap Jumat Pukul 19:30 - 21:00 WIB";
+                      const dMatch = cur.match(/Setiap\s+([A-Za-z]+)/);
+                      const day = dMatch ? dMatch[1] : "Jumat";
+                      const eMatch = cur.match(/-\s*(\d{2}:\d{2})/);
+                      const et = eMatch ? eMatch[1] : "21:00";
+                      setEdit({ ...edit, schedule: `Setiap ${day} Pukul ${st} - ${et} WIB` });
+                    }}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Jam Selesai</Label>
+                  <Input
+                    type="time"
+                    defaultValue="21:00"
+                    onChange={(e) => {
+                      const et = e.target.value || "21:00";
+                      const cur = edit?.schedule || "Setiap Jumat Pukul 19:30 - 21:00 WIB";
+                      const dMatch = cur.match(/Setiap\s+([A-Za-z]+)/);
+                      const day = dMatch ? dMatch[1] : "Jumat";
+                      const sMatch = cur.match(/Pukul\s+(\d{2}:\d{2})/);
+                      const st = sMatch ? sMatch[1] : "19:30";
+                      setEdit({ ...edit, schedule: `Setiap ${day} Pukul ${st} - ${et} WIB` });
+                    }}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Tersimpan: <span className="font-mono font-medium text-foreground">{edit?.schedule || "Setiap Jumat Pukul 19:30 - 21:00 WIB"}</span>
+              </p>
+            </div>
+
             {f("quota", "Kuota", "number")}
             {f("price_prefix", "Awalan harga (mis. Mulai)")}
             {f("price", "Harga paket (Rp)", "number")}
+
+            {/* Pilihan Paket Fleksibel */}
             {(() => {
               const pk: string[] = (edit as any)?.allowed_packages ?? ["monthly", "session"];
               const av: number[] = (edit as any)?.available_sessions ?? [4, 8];
@@ -682,6 +769,7 @@ function KelolaKelas() {
                 </div>
               );
             })()}
+
             {f("whatsapp_link", "Link grup WhatsApp")}
             {f("zoom_link", "Link Zoom")}
             <div className="flex items-center gap-2">
