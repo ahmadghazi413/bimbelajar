@@ -108,6 +108,8 @@ export type Database = {
       classes: {
         Row: {
           advantages: string
+          allowed_packages: string[]
+          available_sessions: number[]
           created_at: string
           default_session_count: number
           description: string
@@ -133,6 +135,8 @@ export type Database = {
         }
         Insert: {
           advantages?: string
+          allowed_packages?: string[]
+          available_sessions?: number[]
           created_at?: string
           default_session_count?: number
           description?: string
@@ -158,6 +162,8 @@ export type Database = {
         }
         Update: {
           advantages?: string
+          allowed_packages?: string[]
+          available_sessions?: number[]
           created_at?: string
           default_session_count?: number
           description?: string
@@ -660,6 +666,7 @@ export type Database = {
           user_id: string
         }[]
       }
+      class_session_count: { Args: { _class_id: string }; Returns: number }
       enrollment_end: {
         Args: { _start: string; _type: string; _weeks: number }
         Returns: string
@@ -677,12 +684,37 @@ export type Database = {
       }
       is_teacher: { Args: { _class_id?: string }; Returns: boolean }
       referral_balance: { Args: { _user_id: string }; Returns: number }
+      session_allowed: {
+        Args: { _session_id: string; _user_id: string }
+        Returns: boolean
+      }
+      sessions_bought: {
+        Args: { _class_id: string; _user_id: string }
+        Returns: number
+      }
       submit_proof: {
         Args: { _enrollment_id: string; _proof_url: string }
         Returns: undefined
       }
       validate_discount: {
         Args: { _class_id: string; _code: string; _use_reward?: boolean }
+        Returns: {
+          code: string
+          discount: number
+          final_amount: number
+          kind: string
+          referrer_id: string
+          reward_amount: number
+          reward_used: number
+        }[]
+      }
+      validate_discount_base: {
+        Args: {
+          _base: number
+          _class_id: string
+          _code: string
+          _use_reward: boolean
+        }
         Returns: {
           code: string
           discount: number

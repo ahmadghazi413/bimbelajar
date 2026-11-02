@@ -17,7 +17,6 @@ import { canConfirmPayment, validateProof } from "@/lib/payment-proofs";
 import { PaymentProof } from "@/components/PaymentProof";
 import { createIpaymuPayment } from "@/lib/ipaymu.functions";
 
-const SESSION_OPTIONS = [1, 2, 4, 8, 10, 12, 16];
 
 export const Route = createFileRoute("/_authenticated/bayar/$slug")({
   head: () => ({
@@ -81,10 +80,33 @@ function Bayar() {
 
   const balance = useQuery(referralBalanceQuery(userId));
 
+  const progress = useQuery({
+    queryKey: ["session-progress", c?.id, userId],
+    enabled: !!c,
+    queryFn: async () => {
+      const sb = supabase as any;
+      const [b, t] = await Promise.all([
+        sb.rpc("sessions_bought", { _user_id: userId, _class_id: c!.id }),
+        sb.rpc("class_session_count", { _class_id: c!.id }),
+      ]);
+      return { bought: Number(b.data ?? 0), total: Number(t.data ?? 0) };
+    },
+  });
+
   if (!c) return <Page title="Memuat...">{null}</Page>;
+  const cx = c as typeof c & { allowed_packages?: string[]; available_sessions?: number[] };
+  const allowed = cx.allowed_packages?.length ? cx.allowed_packages : ["monthly"];
+  const bought = progress.data?.bought ?? 0;
+  const remaining = Math.max((progress.data?.total ?? 0) - bought, 0);
+  const sessionOptions = [
+    ...new Set([...(cx.available_sessions ?? []), ...(bought > 0 && remaining > 0 ? [remaining] : [])]),
+  ].sort((a, b) => a - b);
+  const effType: "monthly" | "session" = allowed.includes(packageType) ? packageType : (allowed[0] as any);
+  const effSessions = sessionOptions.includes(selectedSessions) ? selectedSessions : (sessionOptions[0] ?? 0);
   const e = enr.data;
   const endDate = e?.status === "paid" ? packageEnd(e as any) : null;
-  const canRenew = !!endDate && daysLeft(endDate) <= 7;
+  const sessionTopUp = e?.status === "paid" && (e as any).package_type === "session" && bought > 0 && remaining > 0;
+  const canRenew = (!!endDate && daysLeft(endDate) <= 7) || sessionTopUp;
   const wa = settings?.["admin_whatsapp"] ? `https://wa.me/${settings["admin_whatsapp"]}` : "";
   const bank = {
     bank: settings?.["bank_name"] || "BCA",
@@ -98,7 +120,7 @@ function Bayar() {
       ? classExtra.price_per_session
       : Math.round(c.price / 8);
 
-  const basePrice = packageType === "monthly" ? c.price : sessionPrice * selectedSessions;
+  const basePrice = effType === "monthly" ? c.price : sessionPrice * effSessions;
 
   const quote = useQuery({
     queryKey: ["discount-quote", c?.id, applied?.code, useReward, userId, basePrice],
@@ -140,8 +162,8 @@ function Bayar() {
         data: {
           classId: c.id,
           amount: finalPrice,
-          packageType,
-          sessionsTotal: packageType === "session" ? selectedSessions : undefined,
+          packageType: effType,
+          sessionsTotal: effType === "session" ? effSessions : undefined,
           voucherCode: applied?.kind === "voucher" ? applied.code : null,
           referralCode: applied?.kind === "referral" ? applied.code : null,
           useReward,
@@ -183,8 +205,8 @@ function Bayar() {
             amount: finalPrice,
             method: `Transfer ${bank.bank}`,
             sender_name: sender.trim(),
-            package_type: packageType,
-            sessions_total: packageType === "session" ? selectedSessions : null,
+            package_type: effType,
+            sessions_total: effType === "session" ? effSessions : null,
             voucher_code: applied?.kind === "voucher" ? applied.code : null,
             referral_code: applied?.kind === "referral" ? applied.code : null,
             use_referral_reward: useReward,
@@ -297,6 +319,14 @@ function Bayar() {
           )}
 
           {/* Pilihan Paket: Bulanan vs Per Sesi */}
+          {sessionTopUp && (
+            <div className="rounded-2xl bg-primary/10 p-4 text-sm">
+              <p className="font-semibold text-primary">Anda sudah membuka {bought} sesi. Tersisa {remaining} sesi lagi di kelas ini.</p>
+              <p className="text-muted-foreground">Pilih "{remaining} Sesi" untuk membuka semua sisa sesi sekaligus.</p>
+              <Link to="/kelas-saya" className="text-primary underline">Kembali ke Kelas Saya</Link>
+            </div>
+          )}
+          {allowed.length > 1 && (
           <div className="space-y-2">
             <Label className="font-semibold">Pilih Paket Belajar</Label>
             <div className="grid grid-cols-2 gap-2">
@@ -304,7 +334,7 @@ function Bayar() {
                 type="button"
                 onClick={() => setPackageType("monthly")}
                 className={`rounded-2xl border p-3 text-left transition ${
-                  packageType === "monthly"
+                  effType === "monthly"
                     ? "border-primary bg-primary/10 text-primary font-semibold"
                     : "border-border hover:bg-secondary"
                 }`}
@@ -317,7 +347,7 @@ function Bayar() {
                 type="button"
                 onClick={() => setPackageType("session")}
                 className={`rounded-2xl border p-3 text-left transition ${
-                  packageType === "session"
+                  effType === "session"
                     ? "border-primary bg-primary/10 text-primary font-semibold"
                     : "border-border hover:bg-secondary"
                 }`}
@@ -329,18 +359,19 @@ function Bayar() {
             </div>
           </div>
 
+          )}
           {/* Jika Paket Sesi Dipilih: Pilihan Jumlah Sesi */}
-          {packageType === "session" && (
+          {effType === "session" && (
             <div className="space-y-2 rounded-2xl bg-secondary/40 p-3">
               <Label className="text-xs font-semibold">Pilih Jumlah Pertemuan / Sesi:</Label>
               <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
-                {SESSION_OPTIONS.map((num) => (
+                {sessionOptions.map((num) => (
                   <button
                     key={num}
                     type="button"
                     onClick={() => setSelectedSessions(num)}
                     className={`rounded-xl py-2 text-xs font-bold transition border ${
-                      selectedSessions === num
+                      effSessions === num
                         ? "bg-primary text-primary-foreground border-primary shadow-sm"
                         : "bg-background border-border hover:bg-secondary"
                     }`}
@@ -350,7 +381,7 @@ function Bayar() {
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">
-                Total {selectedSessions} sesi × {rupiah(sessionPrice)} = <b>{rupiah(basePrice)}</b>
+                Total {effSessions} sesi × {rupiah(sessionPrice)} = <b>{rupiah(basePrice)}</b>
               </p>
             </div>
           )}
@@ -360,7 +391,7 @@ function Bayar() {
             <div>
               <p className="text-xs text-muted-foreground">Paket yang dipilih</p>
               <p className="font-semibold text-sm">
-                {packageType === "monthly" ? "Paket Bulanan (Akses 30 Hari)" : `Paket ${selectedSessions} Sesi Pertemuan`}
+                {effType === "monthly" ? "Paket Bulanan (Akses 30 Hari)" : `Paket ${effSessions} Sesi Pertemuan`}
               </p>
             </div>
             <p className="font-display text-lg font-bold text-primary">{rupiah(basePrice)}</p>

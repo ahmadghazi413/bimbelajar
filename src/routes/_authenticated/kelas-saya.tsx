@@ -119,6 +119,12 @@ function KelasSaya() {
                     classId={c.id}
                     userId={userId}
                     locked={locked}
+                    renewSlug={c.slug}
+                    unlockedCount={(() => {
+                      const paid = data!.enr.filter((x: any) => x.class_id === e.class_id && x.status === "paid");
+                      if (paid.some((x: any) => x.package_type !== "session")) return null;
+                      return paid.reduce((n: number, x: any) => n + (x.sessions_total || 0), 0);
+                    })()}
                     sessions={[...c.class_sessions].sort((a, b) => a.level - b.level || a.number - b.number)}
                   />
                 </>

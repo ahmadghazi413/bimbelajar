@@ -71,6 +71,13 @@
       "when": 1792541893578,
       "tag": "0009_payment_proof_management",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793592194510,
+      "tag": "0010_flexible_packages",
+      "breakpoints": true
     }
   ]
 }
