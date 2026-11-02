@@ -167,13 +167,16 @@ function SessionItem({
 }
 
 export function StudentSessions({
-  classId, userId, sessions, locked,
+  classId, userId, sessions, locked, unlockedCount = null, renewSlug,
 }: {
   classId: string;
   userId: string;
   sessions: Tables<"class_sessions">[];
   locked: boolean;
+  unlockedCount?: number | null;
+  renewSlug?: string;
 }) {
+  const order = sessions.filter((x) => x.is_published).map((x) => x.id);
   const qc = useQueryClient();
   const key = ["student-sessions", classId, userId];
   const { data } = useQuery({
@@ -217,7 +220,16 @@ export function StudentSessions({
             <AccordionTrigger className="text-lg font-semibold">Level {lv} · {list.length} sesi</AccordionTrigger>
             <AccordionContent>
               <ol className="space-y-5">
-                {list.map((s) => (
+                {list.map((s) =>
+                  unlockedCount != null && order.indexOf(s.id) + 1 > unlockedCount ? (
+                    <li key={s.id} className="rounded-xl border border-dashed p-3 text-sm">
+                      <p className="font-semibold">🔒 Sesi {s.number}: {s.title}</p>
+                      <p className="text-muted-foreground">Paket Anda mencakup {unlockedCount} sesi. Buka sisa sesi untuk melanjutkan.</p>
+                      {renewSlug && (
+                        <a href={`/bayar/${renewSlug}`} className="mt-2 inline-block font-semibold text-primary underline">Buka Sisa Sesi Kelas</a>
+                      )}
+                    </li>
+                  ) : (
                   <SessionItem
                     key={s.id}
                     s={s}
@@ -229,7 +241,7 @@ export function StudentSessions({
                     res={data?.res.find((x) => x.session_id === s.id)}
                     onChanged={() => qc.invalidateQueries({ queryKey: key })}
                   />
-                ))}
+                  ))}
               </ol>
             </AccordionContent>
           </AccordionItem>
