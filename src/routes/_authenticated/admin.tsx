@@ -493,9 +493,11 @@ function KelolaKelas() {
       price: Number(rest.price ?? 0),
       price_prefix: rest.price_prefix ?? "",
       is_active: rest.is_active ?? true,
-      package_type: rest.package_type === "session" ? "session" : "monthly",
-      package_weeks: rest.package_type === "session" ? 4 : Number(rest.package_weeks || 4),
-      package_sessions: rest.package_type === "session" ? Number(rest.package_sessions || 1) : 0,
+      allowed_packages: (rest as any).allowed_packages?.length ? (rest as any).allowed_packages : ["monthly"],
+      available_sessions: (rest as any).available_sessions ?? [4, 8],
+      price_per_session: Number((rest as any).price_per_session ?? 0),
+      package_type: (rest as any).allowed_packages?.length === 1 && (rest as any).allowed_packages[0] === "session" ? "session" : "monthly",
+      package_weeks: Number(rest.package_weeks || 4),
       sort_order: rest.sort_order ?? 99,
       subject_id: edit.subject_id,
       level_number: Number(rest.level_number ?? 1),
@@ -597,59 +599,61 @@ function KelolaKelas() {
             {f("quota", "Kuota", "number")}
             {f("price_prefix", "Awalan harga (mis. Mulai)")}
             {f("price", "Harga paket (Rp)", "number")}
-            <div className="space-y-1">
-              <Label>Jenis paket</Label>
-              <Select
-                value={edit?.package_type === "session" ? "session" : "monthly"}
-                onValueChange={(v) => setEdit({ ...edit, package_type: v })}
-              >
-                <SelectTrigger aria-label="Jenis paket">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="monthly">Bulanan</SelectItem>
-                  <SelectItem value="session">Per sesi</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {edit?.package_type === "session" ? (
-              <div className="space-y-1">
-                <Label>Jumlah sesi</Label>
-                <Select
-                  value={String(edit?.package_sessions || 1)}
-                  onValueChange={(v) => setEdit({ ...edit, package_sessions: Number(v) })}
-                >
-                  <SelectTrigger aria-label="Jumlah sesi">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 30 }, (_, i) => i + 1).map((n) => (
-                      <SelectItem key={n} value={String(n)}>
-                        {n} sesi
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                <Label>Durasi</Label>
-                <Select
-                  value={String(edit?.package_weeks || 4)}
-                  onValueChange={(v) => setEdit({ ...edit, package_weeks: Number(v) })}
-                >
-                  <SelectTrigger aria-label="Durasi">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">1 minggu</SelectItem>
-                    <SelectItem value="2">2 minggu</SelectItem>
-                    <SelectItem value="3">3 minggu</SelectItem>
-                    <SelectItem value="4">1 bulan</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            {(() => {
+              const pk: string[] = (edit as any)?.allowed_packages ?? ["monthly", "session"];
+              const av: number[] = (edit as any)?.available_sessions ?? [4, 8];
+              const togglePk = (k: string) => {
+                const next = pk.includes(k) ? pk.filter((x) => x !== k) : [...pk, k];
+                setEdit({ ...edit, allowed_packages: next } as any);
+              };
+              const toggleN = (n: number) => {
+                const next = av.includes(n) ? av.filter((x) => x !== n) : [...av, n].sort((a, b) => a - b);
+                setEdit({ ...edit, available_sessions: next } as any);
+              };
+              return (
+                <div className="space-y-3 rounded-2xl border p-3">
+                  <Label>Paket yang dibuka untuk murid</Label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={pk.includes("monthly")} onChange={() => togglePk("monthly")} /> Bulanan
+                  </label>
+                  {pk.includes("monthly") && (
+                    <Select
+                      value={String(edit?.package_weeks || 4)}
+                      onValueChange={(v) => setEdit({ ...edit, package_weeks: Number(v) })}
+                    >
+                      <SelectTrigger aria-label="Durasi"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1 minggu</SelectItem>
+                        <SelectItem value="2">2 minggu</SelectItem>
+                        <SelectItem value="3">3 minggu</SelectItem>
+                        <SelectItem value="4">1 bulan</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={pk.includes("session")} onChange={() => togglePk("session")} /> Per sesi
+                  </label>
+                  {pk.includes("session") && (
+                    <>
+                      {f("price_per_session" as any, "Harga per sesi (Rp)", "number")}
+                      <p className="text-xs text-muted-foreground">Centang jumlah sesi yang boleh dipilih murid:</p>
+                      <div className="grid grid-cols-6 gap-1.5">
+                        {Array.from({ length: 30 }, (_, i) => i + 1).map((n) => (
+                          <button
+                            key={n}
+                            type="button"
+                            onClick={() => toggleN(n)}
+                            className={`rounded-lg border py-1.5 text-xs font-semibold ${av.includes(n) ? "border-primary bg-primary text-primary-foreground" : "bg-background"}`}
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
             {f("whatsapp_link", "Link grup WhatsApp")}
             {f("zoom_link", "Link Zoom")}
             <div className="flex items-center gap-2">
