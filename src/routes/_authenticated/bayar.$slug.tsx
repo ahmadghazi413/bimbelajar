@@ -353,8 +353,8 @@ function Bayar() {
                 }`}
               >
                 <div className="text-xs text-muted-foreground">Fleksibel</div>
-                <div className="text-sm font-bold">Paket Per Sesi</div>
-                <div className="text-xs text-primary mt-1">{rupiah(sessionPrice)} / sesi</div>
+                <div className="text-sm font-bold">Bayar Paket Sesi</div>
+                <div className="text-xs text-primary mt-1">Pilih jumlah sesi</div>
               </button>
             </div>
           </div>
@@ -381,7 +381,7 @@ function Bayar() {
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">
-                Total {effSessions} sesi × {rupiah(sessionPrice)} = <b>{rupiah(basePrice)}</b>
+                Paket {effSessions} Sesi: <b>{rupiah(basePrice)}</b>
               </p>
             </div>
           )}
