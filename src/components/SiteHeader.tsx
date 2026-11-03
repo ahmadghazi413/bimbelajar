@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Menu, BookOpen, MessageCircle } from "lucide-react";
+import { Menu, BookOpen, MessageCircle, Download } from "lucide-react";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -69,6 +69,18 @@ export function SiteHeader() {
                 <Link to={session ? "/kelas-saya" : "/auth"} className={item}>Kelas Saya</Link>
                 <Link to={session ? "/pembayaran" : "/auth"} className={item}>Riwayat Pembayaran</Link>
                 <Link to={session ? "/profil" : "/auth"} className={item}>Profil</Link>
+{/* Tombol Unduh APK jika admin sudah upload */}
+{settings?.["apk_url"] && (
+  <a
+    href={settings["apk_url"]}
+    download={settings["apk_name"] || "PadatIlmu.apk"}
+    target="_blank"
+    rel="noreferrer"
+    className={`${item} flex items-center gap-2 text-primary font-semibold bg-primary/10`}
+  >
+    <Download className="h-4 w-4" /> Download Aplikasi (APK)
+  </a>
+)}
 
                 <div className="pt-3 mt-3 border-t">
                   <p className="px-4 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Informasi</p>
