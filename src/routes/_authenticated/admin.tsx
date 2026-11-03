@@ -1624,6 +1624,49 @@ function Pengaturan() {
     qc.invalidateQueries();
   }
 
+  async function uploadApk(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".apk")) {
+      toast.error("File harus berformat .apk");
+      return;
+    }
+    setBusy(true);
+    const path = `apk/PadatIlmu-${Date.now()}.apk`;
+    const up = await supabase.storage.from("app-files").upload(path, file, {
+      upsert: true,
+      contentType: "application/vnd.android.package-archive",
+    });
+    if (up.error) {
+      setBusy(false);
+      toast.error("Gagal mengunggah APK: " + up.error.message);
+      return;
+    }
+    const { data: pub } = supabase.storage.from("app-files").getPublicUrl(path);
+    await supabase.from("settings").upsert([
+      { key: "apk_url", value: pub.publicUrl },
+      { key: "apk_name", value: file.name },
+    ]);
+    setBusy(false);
+    toast.success("File APK berhasil diunggah!");
+    qc.invalidateQueries({ queryKey: ["settings"] });
+    qc.invalidateQueries({ queryKey: ["admin-settings"] });
+    e.target.value = "";
+  }
+
+  async function removeApk() {
+    if (!confirm("Hapus file APK aplikasi?")) return;
+    setBusy(true);
+    await supabase.from("settings").upsert([
+      { key: "apk_url", value: "" },
+      { key: "apk_name", value: "" },
+    ]);
+    setBusy(false);
+    toast.success("File APK dihapus.");
+    qc.invalidateQueries({ queryKey: ["settings"] });
+    qc.invalidateQueries({ queryKey: ["admin-settings"] });
+  }
+
   return (
     <div className="mt-4 space-y-4">
       {SETTING_FIELDS.map((f) => (
@@ -1698,6 +1741,49 @@ function Pengaturan() {
         />
         {vals["qris_image_url"] && (
           <p className="mt-2 text-center text-xs text-muted-foreground">QRIS saat ini sudah terpasang.</p>
+        )}
+      </div>
+
+      {/* Bagian Upload APK Android */}
+      <div className="rounded-2xl border border-dashed p-4">
+        <Label htmlFor="apk-input" className="flex cursor-pointer flex-col items-center gap-2 py-2 text-center">
+          <span className="font-semibold">Unggah File Aplikasi Android (.APK)</span>
+          <span className="text-xs text-muted-foreground">Khusus file format .apk aplikasi PadatIlmu</span>
+        </Label>
+        <input
+          id="apk-input"
+          type="file"
+          accept=".apk"
+          className="hidden"
+          disabled={busy}
+          onChange={uploadApk}
+        />
+        {vals["apk_url"] ? (
+          <div className="mt-3 flex flex-col items-center gap-2 bg-secondary/50 p-3 rounded-xl border">
+            <p className="text-xs font-medium text-foreground">
+              File aktif: <span className="text-primary font-semibold">{vals["apk_name"] || "PadatIlmu.apk"}</span>
+            </p>
+            <div className="flex gap-2">
+              <Button asChild size="sm" variant="outline" className="text-xs h-7">
+                <a href={vals["apk_url"]} target="_blank" rel="noreferrer" download>
+                  Uji Unduh APK
+                </a>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={removeApk}
+                disabled={busy}
+                className="text-destructive text-xs hover:bg-destructive/10 h-7"
+              >
+                Hapus APK
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-1 text-center text-xs text-muted-foreground">
+            Belum ada APK yang diunggah. Menu unduh di garis tiga akan otomatis muncul setelah APK diunggah.
+          </p>
         )}
       </div>
     </div>
