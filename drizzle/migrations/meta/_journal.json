@@ -78,6 +78,13 @@
       "when": 1793592194510,
       "tag": "0010_flexible_packages",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1793703277851,
+      "tag": "0011_app_files_policies",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,4 @@
+CREATE POLICY "app files read all" ON storage.objects FOR SELECT TO anon, authenticated USING (bucket_id = 'app-files');
+CREATE POLICY "app files admin insert" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'app-files' AND public.has_role(auth.uid(), 'admin'));
+CREATE POLICY "app files admin update" ON storage.objects FOR UPDATE TO authenticated USING (bucket_id = 'app-files' AND public.has_role(auth.uid(), 'admin'));
+CREATE POLICY "app files admin delete" ON storage.objects FOR DELETE TO authenticated USING (bucket_id = 'app-files' AND public.has_role(auth.uid(), 'admin'));
