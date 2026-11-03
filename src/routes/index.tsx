@@ -21,7 +21,7 @@ import { subjectsQuery } from "@/lib/queries";
 import { packageTitle, tanggal } from "@/lib/format";
 import { packageEnd, daysLeft } from "@/lib/notifications";
 import { NotificationModal } from "@/components/NotificationModal";
-import { InstallAppCard } from "@/components/InstallAppCard";
+<InstallAppCard />
 
 export const Route = createFileRoute("/")({
   head: () => ({
