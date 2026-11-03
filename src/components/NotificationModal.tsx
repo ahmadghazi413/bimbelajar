@@ -6,44 +6,42 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { requestPushPermission } from "@/lib/push-notifications";
 
+/** Popup izin notifikasi — ditampilkan di Beranda saat pertama dibuka. */
 export function NotificationModal() {
   const { session } = useAuth();
+  const userId = session?.user?.id;
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Hanya periksa jika user sudah login
-    if (!session?.user?.id) return;
-
-    // Periksa apakah browser mendukung Web Notification
     if (!("Notification" in window)) return;
+    if (Notification.permission !== "default") return;
+    const dismissed = localStorage.getItem("dismissed_push_modal");
+    if (dismissed && Date.now() - Number(dismissed) < 24 * 60 * 60 * 1000) return;
+    const t = setTimeout(() => setOpen(true), 1000);
+    return () => clearTimeout(t);
+  }, []);
 
-    // Jika izin belum pernah diminta (masih 'default')
-    if (Notification.permission === "default") {
-      const dismissed = localStorage.getItem("dismissed_push_modal");
-      const oneDay = 24 * 60 * 60 * 1000;
-
-      // Tampilkan popup jika belum pernah ditutup atau sudah lewat 1 hari
-      if (!dismissed || Date.now() - Number(dismissed) > oneDay) {
-        const timer = setTimeout(() => setOpen(true), 1500); // Muncul anggun setelah 1.5 detik
-        return () => clearTimeout(timer);
-      }
+  // Jika izin sudah diberikan saat belum login, simpan perangkat setelah login.
+  useEffect(() => {
+    if (userId && "Notification" in window && Notification.permission === "granted") {
+      requestPushPermission(userId).catch(() => {});
     }
-  }, [session?.user?.id]);
+  }, [userId]);
 
   async function handleAllow() {
-    if (!session?.user?.id) return;
     setLoading(true);
-    const res = await requestPushPermission(session.user.id);
-    setLoading(false);
-
-    if (res.success) {
-      toast.success(res.message);
-      setOpen(false);
+    if (userId) {
+      const res = await requestPushPermission(userId);
+      res.success ? toast.success(res.message) : toast.error(res.message);
     } else {
-      toast.error(res.message);
-      setOpen(false);
+      const p = await Notification.requestPermission();
+      p === "granted"
+        ? toast.success("Notifikasi diizinkan! Masuk ke akun agar info kelas Anda terkirim.")
+        : toast.error("Izin notifikasi tidak diberikan.");
     }
+    setLoading(false);
+    setOpen(false);
   }
 
   function handleDismiss() {
@@ -58,32 +56,17 @@ export function NotificationModal() {
           <div className="mx-auto sm:mx-0 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-2">
             <Bell className="h-6 w-6" />
           </div>
-          <DialogTitle className="text-xl font-semibold">
-            Jangan Tertinggal Info & Jadwal Kelas!
-          </DialogTitle>
+          <DialogTitle className="text-xl font-semibold">Jangan Tertinggal Info & Jadwal Kelas!</DialogTitle>
           <DialogDescription className="text-muted-foreground text-sm pt-1">
-            Aktifkan notifikasi agar Anda selalu mendapat pengingat jadwal Zoom, rekaman video baru, dan pengumuman penting langsung di layar HP Anda.
+            Izinkan notifikasi agar Anda selalu mendapat pengingat jadwal kelas, masa paket yang hampir berakhir, dan pengumuman penting langsung di HP Anda.
           </DialogDescription>
         </DialogHeader>
-
         <DialogFooter className="mt-4 flex flex-col sm:flex-row gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full sm:w-auto"
-            onClick={handleDismiss}
-            disabled={loading}
-          >
+          <Button type="button" variant="outline" className="w-full sm:w-auto" onClick={handleDismiss} disabled={loading}>
             Nanti Saja
           </Button>
-          <Button
-            type="button"
-            variant="hero"
-            className="w-full sm:w-auto"
-            onClick={handleAllow}
-            disabled={loading}
-          >
-            {loading ? "Memproses..." : "Aktifkan Notifikasi"}
+          <Button type="button" variant="hero" className="w-full sm:w-auto" onClick={handleAllow} disabled={loading}>
+            {loading ? "Memproses..." : "Setuju, Aktifkan"}
           </Button>
         </DialogFooter>
       </DialogContent>

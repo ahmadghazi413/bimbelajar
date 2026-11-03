@@ -20,6 +20,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { subjectsQuery } from "@/lib/queries";
 import { packageTitle, tanggal } from "@/lib/format";
 import { packageEnd, daysLeft } from "@/lib/notifications";
+import { NotificationModal } from "@/components/NotificationModal";
+import { InstallAppCard } from "@/components/InstallAppCard";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -86,7 +88,9 @@ function IndexPage() {
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
+      <NotificationModal />
       <div className="container max-w-4xl mx-auto px-4 py-6 sm:py-8 space-y-8">
+        <InstallAppCard />
         
         {/* ========================================================= */}
         {/* BAR 1: STATUS AKUN PENGGUNA (PREMIUM/FREE) & HERO PADAT   */}
