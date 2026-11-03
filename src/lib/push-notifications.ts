@@ -26,13 +26,13 @@ export async function requestPushPermission(userId: string): Promise<{ success: 
 
     if (sub) {
       const subJson = sub.toJSON();
-      if (subJson.endpoint && subJson.keys?.p256dh && subJson.keys?.auth) {
+      if (subJson.endpoint && subJson.keys?.["p256dh"] && subJson.keys?.["auth"]) {
         await supabase.from("push_subscriptions" as any).upsert(
           {
             user_id: userId,
             endpoint: subJson.endpoint,
-            p256dh: subJson.keys.p256dh,
-            auth: subJson.keys.auth,
+            p256dh: subJson.keys["p256dh"],
+            auth: subJson.keys["auth"],
             user_agent: navigator.userAgent,
             updated_at: new Date().toISOString(),
           },

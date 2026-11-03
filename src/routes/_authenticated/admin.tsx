@@ -577,8 +577,8 @@ function KelolaKelas() {
                 onClick={() =>
                   setEdit({
                     ...c,
-                    whatsapp_link: c.class_private?.[0]?.whatsapp_link ?? "",
-                    zoom_link: c.class_private?.[0]?.zoom_link ?? "",
+                    whatsapp_link: ((Array.isArray(c.class_private) ? c.class_private[0] : c.class_private) as any)?.whatsapp_link ?? "",
+                    zoom_link: ((Array.isArray(c.class_private) ? c.class_private[0] : c.class_private) as any)?.zoom_link ?? "",
                   })
                 }
               >
