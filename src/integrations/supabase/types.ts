@@ -132,6 +132,7 @@ export type Database = {
           sort_order: number
           subject_id: string | null
           tagline: string
+          teacher_id: string | null
         }
         Insert: {
           advantages?: string
@@ -159,6 +160,7 @@ export type Database = {
           sort_order?: number
           subject_id?: string | null
           tagline?: string
+          teacher_id?: string | null
         }
         Update: {
           advantages?: string
@@ -186,6 +188,7 @@ export type Database = {
           sort_order?: number
           subject_id?: string | null
           tagline?: string
+          teacher_id?: string | null
         }
         Relationships: [
           {
@@ -716,6 +719,14 @@ export type Database = {
         Returns: boolean
       }
       is_teacher: { Args: { _class_id?: string }; Returns: boolean }
+      public_teachers: {
+        Args: never
+        Returns: {
+          id: string
+          name: string
+          photo_path: string
+        }[]
+      }
       referral_balance: { Args: { _user_id: string }; Returns: number }
       session_allowed: {
         Args: { _session_id: string; _user_id: string }
