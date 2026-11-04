@@ -1,0 +1,1 @@
+ALTER POLICY "teacher photos read" ON storage.objects USING (bucket_id='teacher-photos' AND (public.has_role(auth.uid(),'admin') OR EXISTS(SELECT 1 FROM public.public_teachers() t WHERE t.photo_path=storage.objects.name)));
