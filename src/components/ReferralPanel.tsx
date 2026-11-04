@@ -16,7 +16,7 @@ export function ReferralPanel({ userId }: { userId: string }) {
     catch { toast.error("Tidak dapat menyalin kode. Silakan salin kode yang tertera."); }
   }
   const discount = config.data?.discount_type === "fixed" ? rupiah(config.data.discount_value) : `${config.data?.discount_value ?? 0}%`;
-  const text = `Yuk belajar ngaji di Bimbelajar! Gunakan kode ${code ?? ""} saat daftar kelas untuk diskon ${discount}. https://bimbelajar.lovable.app/kelas`;
+  const text = `Yuk belajar di PadatIlmu! Gunakan kode ${code ?? ""} saat daftar kelas untuk diskon ${discount}. https://padatilmu.web.id/kelas`;
   return <section className="mt-6 space-y-3 border-t pt-6">
     <h2 className="text-xl font-semibold">Ajak Teman</h2>
     {account.isPending ? <p>Memuat kode...</p> : account.error ? <p className="text-destructive">Kode belum dapat dimuat.</p> : <p className="break-all font-mono text-xl font-semibold text-primary">{code}</p>}

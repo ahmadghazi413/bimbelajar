@@ -85,6 +85,20 @@
       "when": 1793703277851,
       "tag": "0011_app_files_policies",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793754680922,
+      "tag": "0012_teacher_assignments_and_photos",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793754892042,
+      "tag": "0013_teacher_photo_read_path",
+      "breakpoints": true
     }
   ]
 }

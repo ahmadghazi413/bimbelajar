@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { StudentSessions } from "@/components/StudentSessions";
 import { packageEnd, daysLeft } from "@/lib/notifications";
 import { packageTitle, tanggal } from "@/lib/format";
+import { TeacherIdentity } from "@/components/TeacherIdentity";
 
 export const Route = createFileRoute("/_authenticated/kelas-saya")({
   head: () => ({ meta: [{ title: "Kelas Saya — Bimbelajar" }, { name: "description", content: "Kelas ngaji yang Anda ikuti, jadwal dan akses belajar Bimbelajar." }, { property: "og:title", content: "Kelas Saya — Bimbelajar" }, { property: "og:description", content: "Kelas ngaji yang Anda ikuti, jadwal dan akses belajar Bimbelajar." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
@@ -94,8 +95,9 @@ function KelasSaya() {
       )}
       <div className="space-y-6">
         {list.map((e) => {
-          const c = e.classes!;
-          const p = data!.priv.find((x) => x.class_id === e.class_id);
+          const c = e.classes;
+          if (!c) return null;
+          const p = data?.priv.find((x) => x.class_id === e.class_id);
           const endAt = packageEnd(e);
           const locked = !!endAt && daysLeft(endAt) <= 0;
           return (
@@ -105,6 +107,7 @@ function KelasSaya() {
                 <StatusBadge status={e.status} />
               </div>
               <p className="mt-2 flex items-center gap-2 text-muted-foreground"><CalendarDays className="h-4 w-4" /> {c.schedule}</p>
+              <TeacherIdentity teacherId={c.teacher_id} />
               {e.status === "paid" ? (
                 <>
                   <PackageStatus e={e} slug={c.slug} />
@@ -121,7 +124,7 @@ function KelasSaya() {
                     locked={locked}
                     renewSlug={c.slug}
                     unlockedCount={(() => {
-                      const paid = data!.enr.filter((x: any) => x.class_id === e.class_id && x.status === "paid");
+                      const paid = (data?.enr ?? []).filter((x: any) => x.class_id === e.class_id && x.status === "paid");
                       if (paid.some((x: any) => x.package_type !== "session")) return null;
                       return paid.reduce((n: number, x: any) => n + (x.sessions_total || 0), 0);
                     })()}
