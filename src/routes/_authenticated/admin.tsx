@@ -529,7 +529,7 @@ function KelolaKelas() {
             <div className="space-y-1"><Label>Pengajar kelas</Label>
               <Select value={edit?.teacher_id || "none"} onValueChange={(v) => setEdit({ ...edit, teacher_id: v === "none" ? null : v })}>
                 <SelectTrigger aria-label="Pengajar kelas"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Belum dipilih</SelectItem>{teachers.filter((t) => !edit?.id || teacherHasClass(t, edit.id)).map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
-              </Select><TeacherIdentity teacherId={edit?.teacher_id} />
+              </Select><TeacherIdentity teacherId={edit?.teacher_id ?? null} />
             </div>
             {f("tagline", "Tagline")}
             {f("description", "Deskripsi", "area")}
