@@ -1,4 +1,10 @@
 # Referral
+## Perbaikan November
+- [ ] Periksa dan perbaiki login Google dan tujuan reset password.
+- [ ] Checklist ilmu/kelas guru dan uji akses semua kelas.
+- [ ] Ubah tautan WhatsApp referral ke https://padatilmu.web.id/kelas.
+- [ ] Foto pengajar dan pilihan pengajar pada kelas.
+
 - [x] Kode pribadi dan perhitungan diskon/bonus aman.
 - [x] Pengaturan admin, kode di profil, penerapan saat bayar.
 - [x] Pengujian aturan dan alur melalui website.
