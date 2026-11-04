@@ -19,6 +19,9 @@ import { AdminDelete } from "@/components/AdminDelete";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { classesInSubject, classLevelName } from "@/lib/class-management";
 import { settingsQuery } from "@/lib/queries";
+import { parseTeachers, teacherHasClass, type Teacher } from "@/lib/teachers";
+import { Checkbox } from "@/components/ui/checkbox";
+import { TeacherIdentity } from "@/components/TeacherIdentity";
 import { PaymentProof } from "@/components/PaymentProof";
 import { FILE_MAX_BYTES, fileExt, openPrivateFile } from "@/lib/session-content";
 
@@ -56,7 +59,13 @@ function useClasses() {
     queryFn: async () => {
       const { data, error } = await supabase.from("classes").select("*, class_private(*)").order("sort_order");
       if (error) throw error;
-      return data ?? [];
+      const { data: admin } = await supabase.rpc("has_role", { _user_id: (await supabase.auth.getUser()).data.user?.id ?? "", _role: "admin" });
+      if (admin) return data ?? [];
+      const { data: settings, error: settingsError } = await supabase.from("settings").select("value").eq("key", "teacher_list").maybeSingle();
+      if (settingsError) throw settingsError;
+      const { data: user } = await supabase.auth.getUser();
+      const teacher = parseTeachers(settings?.value).find((t) => t.email.toLowerCase() === user.user?.email?.toLowerCase());
+      return teacher ? (data ?? []).filter((c) => teacherHasClass(teacher, c.id)) : [];
     },
   });
 }
@@ -98,17 +107,9 @@ function Admin() {
   const { session, isAdmin, loading } = useAuth();
   const { data: settings } = useQuery(settingsQuery);
 
-  // Daftar pengajar yang didaftarkan oleh admin
-  const teacherList: { email: string; name: string }[] = (() => {
-    try {
-      return settings?.["teacher_list"] ? JSON.parse(settings["teacher_list"]) : [];
-    } catch {
-      return [];
-    }
-  })();
-
-  const userEmail = session?.user?.email?.toLowerCase();
-  const isTeacher = teacherList.some((t) => t.email?.toLowerCase() === userEmail);
+  const teacherList = parseTeachers(settings?.["teacher_list"]);
+  const userEmail = session?.user.email?.toLowerCase();
+  const isTeacher = teacherList.some((t) => t.email.toLowerCase() === userEmail);
 
   if (loading) return <Page title="Panel Akses">Memuat...</Page>;
 
@@ -177,162 +178,75 @@ function Admin() {
 function KelolaPengajar() {
   const qc = useQueryClient();
   const { data: settings } = useQuery(settingsQuery);
-  const { data: classes } = useClasses();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [classId, setClassId] = useState("");
+  const { data: classes = [] } = useClasses();
+  const { data: subjects = [] } = useSubjects();
+  const teachers = parseTeachers(settings?.["teacher_list"]);
+  const [edit, setEdit] = useState<Teacher>({ id: "", name: "", email: "", classIds: [], allClasses: false, createdAt: "" });
   const [busy, setBusy] = useState(false);
-
-  const teacherList: { id: string; name: string; email: string; classId?: string; createdAt: string }[] =
-    (() => {
-      try {
-        return settings?.["teacher_list"] ? JSON.parse(settings["teacher_list"]) : [];
-      } catch {
-        return [];
-      }
-    })();
-
-  async function addTeacher(e: React.FormEvent) {
+  const [photo, setPhoto] = useState<File | null>(null);
+  const selected = (id: string) => teacherHasClass(edit, id);
+  function toggle(ids: string[], checked: boolean) {
+    const current = classes.filter((c) => selected(c.id)).map((c) => c.id);
+    setEdit({ ...edit, allClasses: false, classIds: checked ? [...new Set([...current, ...ids])] : current.filter((id) => !ids.includes(id)) });
+  }
+  async function save(e: React.FormEvent) {
     e.preventDefault();
-    if (!email.trim() || !name.trim()) {
-      toast.error("Nama dan email pengajar wajib diisi.");
-      return;
-    }
-    const cleanEmail = email.trim().toLowerCase();
-    if (teacherList.some((t) => t.email.toLowerCase() === cleanEmail)) {
-      toast.error("Email pengajar ini sudah terdaftar.");
-      return;
-    }
-
+    if (!edit.name.trim() || !edit.email.trim()) return;
+    if (!edit.allClasses && !edit.classIds?.length) { toast.error("Pilih minimal satu kelas."); return; }
+    if (teachers.some((t) => t.id !== edit.id && t.email.toLowerCase() === edit.email.trim().toLowerCase())) { toast.error("Email pengajar sudah terdaftar."); return; }
     setBusy(true);
-    const updated = [
-      ...teacherList,
-      {
-        id: crypto.randomUUID(),
-        name: name.trim(),
-        email: cleanEmail,
-        classId: classId && classId !== "all" ? classId : undefined,
-        createdAt: new Date().toISOString(),
-      },
-    ];
-
-    const { error } = await supabase.from("settings").upsert({
-      key: "teacher_list",
-      value: JSON.stringify(updated),
-    });
-
-    setBusy(false);
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    toast.success(`Pengajar ${name} berhasil didaftarkan!`);
-    setName("");
-    setEmail("");
-    setClassId("");
-    qc.invalidateQueries({ queryKey: ["settings"] });
+    let uploaded = "";
+    try {
+      const next = { ...edit, id: edit.id || crypto.randomUUID(), name: edit.name.trim(), email: edit.email.trim().toLowerCase(), createdAt: edit.createdAt || new Date().toISOString() };
+      if (photo) {
+        if (!["image/jpeg", "image/png", "image/webp"].includes(photo.type) || photo.size > 5 * 1024 * 1024) throw new Error("Pilih foto JPG, PNG atau WebP maksimal 5 MB.");
+        uploaded = `${next.id}/${crypto.randomUUID()}.${photo.type.split("/")[1]}`;
+        const { error } = await supabase.storage.from("teacher-photos").upload(uploaded, photo);
+        if (error) throw error;
+        next.photoPath = uploaded;
+      }
+      const updated = edit.id ? teachers.map((t) => t.id === edit.id ? next : t) : [...teachers, next];
+      const { error } = await supabase.from("settings").upsert({ key: "teacher_list", value: JSON.stringify(updated) });
+      if (error) throw error;
+      if (uploaded && edit.photoPath) await supabase.storage.from("teacher-photos").remove([edit.photoPath]);
+      setEdit({ id: "", name: "", email: "", classIds: [], allClasses: false, createdAt: "" }); setPhoto(null);
+      await qc.invalidateQueries(); toast.success("Pengajar disimpan.");
+    } catch (error) {
+      if (uploaded) await supabase.storage.from("teacher-photos").remove([uploaded]);
+      toast.error(error instanceof Error ? error.message : "Pengajar belum tersimpan.");
+    } finally { setBusy(false); }
   }
-
-  async function removeTeacher(id: string) {
+  async function remove(t: Teacher) {
     if (!confirm("Hapus akses pengajar ini?")) return;
-    const updated = teacherList.filter((t) => t.id !== id);
-    const { error } = await supabase.from("settings").upsert({
-      key: "teacher_list",
-      value: JSON.stringify(updated),
-    });
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-    toast.success("Akses pengajar dihapus.");
-    qc.invalidateQueries({ queryKey: ["settings"] });
+    const { error } = await supabase.from("settings").upsert({ key: "teacher_list", value: JSON.stringify(teachers.filter((x) => x.id !== t.id)) });
+    if (error) { toast.error(error.message); return; }
+    if (t.photoPath) await supabase.storage.from("teacher-photos").remove([t.photoPath]);
+    await qc.invalidateQueries();
   }
-
-  return (
-    <div className="mt-4 space-y-6">
-      <div className="rounded-xl border bg-card p-4">
-        <h3 className="font-semibold text-lg mb-1">Daftarkan Pengajar / Guru Baru</h3>
-        <p className="text-xs text-muted-foreground mb-4">
-          Pengajar yang didaftarkan di sini hanya dapat membuka <strong>Section Sesi</strong> dan <strong>Input Nilai Santri</strong>, tanpa akses ke data keuangan, peserta, maupun pengaturan website.
-        </p>
-        <form onSubmit={addTeacher} className="space-y-3">
-          <div>
-            <Label>Nama Lengkap Pengajar</Label>
-            <Input
-              placeholder="Contoh: Ustadz Ahmad / Ustadzah Fulanah"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <Label>Email Akun Pengajar</Label>
-            <Input
-              type="email"
-              placeholder="emailpengajar@gmail.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Pastikan pengajar mendaftar atau masuk dengan alamat email ini.
-            </p>
-          </div>
-          <div>
-            <Label>Kelas yang Diampu (Opsional)</Label>
-            <Select value={classId} onValueChange={setClassId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Semua Kelas / Pilih Kelas" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Semua Kelas</SelectItem>
-                {classes?.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <Button type="submit" disabled={busy}>
-            {busy ? "Menyimpan..." : "+ Tambahkan Pengajar"}
-          </Button>
-        </form>
-      </div>
-
-      <div className="rounded-xl border bg-card p-4">
-        <h3 className="font-semibold text-base mb-3">Daftar Pengajar Aktif ({teacherList.length})</h3>
-        {teacherList.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Belum ada pengajar yang didaftarkan.</p>
-        ) : (
-          <div className="divide-y">
-            {teacherList.map((t) => {
-              const assignedClass = classes?.find((c) => c.id === t.classId);
-              return (
-                <div key={t.id} className="py-3 flex items-center justify-between gap-2">
-                  <div>
-                    <div className="font-medium text-sm">{t.name}</div>
-                    <div className="text-xs text-muted-foreground">{t.email}</div>
-                    <div className="text-xs text-primary mt-0.5">
-                      Pengampu: {assignedClass ? assignedClass.name : "Semua Kelas"}
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-destructive hover:bg-destructive/10"
-                    onClick={() => removeTeacher(t.id)}
-                  >
-                    Hapus
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+  return <div className="mt-4 space-y-6">
+    <h2 className="text-lg font-semibold">{edit.id ? "Ubah pengajar" : "Tambah pengajar"}</h2>
+    <form onSubmit={save} className="max-w-xl space-y-4">
+      <div><Label htmlFor="teacher-name">Nama pengajar</Label><Input id="teacher-name" required value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></div>
+      <div><Label htmlFor="teacher-email">Email akun pengajar</Label><Input id="teacher-email" type="email" required value={edit.email} onChange={(e) => setEdit({ ...edit, email: e.target.value })} /></div>
+      <div><Label htmlFor="teacher-photo">Foto pengajar</Label><Input key={edit.id} id="teacher-photo" type="file" accept="image/jpeg,image/png,image/webp" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />{edit.id && <TeacherIdentity teacherId={edit.id} />}</div>
+      <label className="flex items-center gap-2"><Checkbox checked={!!edit.allClasses} onCheckedChange={(v) => setEdit({ ...edit, allClasses: v === true, classIds: v === true ? classes.map((c) => c.id) : [] })} />Semua kelas</label>
+      {subjects.map((subject) => {
+        const items = classes.filter((c) => c.subject_id === subject.id);
+        return <fieldset key={subject.id} className="space-y-2 border-t pt-3">
+          <label className="flex items-center gap-2 font-semibold"><Checkbox checked={items.length > 0 && items.every((c) => selected(c.id))} onCheckedChange={(v) => toggle(items.map((c) => c.id), v === true)} />{subject.name}</label>
+          {items.map((c) => <label key={c.id} className="ml-6 flex items-center gap-2 text-sm"><Checkbox checked={selected(c.id)} onCheckedChange={(v) => toggle([c.id], v === true)} />{classLevelName(c)}</label>)}
+        </fieldset>;
+      })}
+      {classes.filter((c) => !c.subject_id).map((c) => <label key={c.id} className="flex items-center gap-2"><Checkbox checked={selected(c.id)} onCheckedChange={(v) => toggle([c.id], v === true)} />{c.name}</label>)}
+      <Button type="submit" disabled={busy}>{busy ? "Menyimpan..." : "Simpan pengajar"}</Button>
+      {edit.id && <Button type="button" variant="outline" onClick={() => { setEdit({ id: "", name: "", email: "", classIds: [], allClasses: false, createdAt: "" }); setPhoto(null); }}>Batal</Button>}
+    </form>
+    <h2 className="text-lg font-semibold">Daftar pengajar</h2>
+    {teachers.map((t) => <div key={t.id} className="flex flex-wrap items-center justify-between gap-3 border-t py-3">
+      <div><TeacherIdentity teacherId={t.id} /><p className="font-semibold">{t.name}</p><p className="text-sm text-muted-foreground">{t.email}</p><p className="text-sm">{classes.filter((c) => teacherHasClass(t, c.id)).map((c) => c.name).join(", ") || "Belum ada kelas"}</p></div>
+      <div className="flex gap-2"><Button variant="outline" onClick={() => { setEdit({ ...t, allClasses: t.allClasses ?? (!t.classId && !t.classIds), classIds: classes.filter((c) => teacherHasClass(t, c.id)).map((c) => c.id) }); setPhoto(null); }}>Ubah</Button><Button variant="ghost" onClick={() => remove(t)}>Hapus</Button></div>
+    </div>)}
+  </div>;
 }
 
 
@@ -471,6 +385,8 @@ type ClassForm = Partial<Tables<"classes">> & {
 
 function KelolaKelas() {
   const { data } = useClasses();
+  const { data: settings } = useQuery(settingsQuery);
+  const teachers = parseTeachers(settings?.["teacher_list"]);
   const qc = useQueryClient();
   const [edit, setEdit] = useState<ClassForm | null>(null);
 
@@ -504,6 +420,7 @@ function KelolaKelas() {
       level_label: rest.level_label ?? "Pemula (Dari Nol)",
       levels_label: rest.levels_label ?? `Level ${rest.level_number ?? 1} · Pemula (Dari Nol)`,
       advantages: rest.advantages ?? "",
+      teacher_id: rest.teacher_id || null,
     };
     const res = rest.id
       ? await supabase.from("classes").update(payload).eq("id", rest.id).select().single()
@@ -609,6 +526,11 @@ function KelolaKelas() {
               onChange={(v) => setEdit((current) => (current ? { ...current, subject_id: v } : null))}
             />
             {f("name", "Nama kelas")}
+            <div className="space-y-1"><Label>Pengajar kelas</Label>
+              <Select value={edit?.teacher_id || "none"} onValueChange={(v) => setEdit({ ...edit, teacher_id: v === "none" ? null : v })}>
+                <SelectTrigger aria-label="Pengajar kelas"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Belum dipilih</SelectItem>{teachers.filter((t) => !edit?.id || teacherHasClass(t, edit.id)).map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
+              </Select><TeacherIdentity teacherId={edit?.teacher_id} />
+            </div>
             {f("tagline", "Tagline")}
             {f("description", "Deskripsi", "area")}
             {f("goals", "Tujuan", "area")}
@@ -816,14 +738,16 @@ function KelolaSesi() {
   const [subjectId, setSubjectId] = useState("");
   const [classId, setClassId] = useState("");
   const qc = useQueryClient();
-  const { data, refetch } = useQuery({
+  const { data, error: sessionError, refetch } = useQuery({
     queryKey: ["admin-sesi", classId],
     enabled: !!classId,
     queryFn: async () => {
       const { data: s, error } = await supabase.from("class_sessions").select("*").eq("class_id", classId).order("level").order("number");
       if (error) throw error;
-      const { data: r } = await supabase.from("session_recordings").select("*").eq("class_id", classId);
-      const { data: pv } = await (supabase as any).from("session_private").select("*").eq("class_id", classId);
+      const { data: r, error: recordingError } = await supabase.from("session_recordings").select("*").eq("class_id", classId);
+      if (recordingError) throw recordingError;
+      const { data: pv, error: privateError } = await supabase.from("session_private").select("*").eq("class_id", classId);
+      if (privateError) throw privateError;
       return (s ?? []).map((x) => {
         const priv = (pv ?? []).find((y: any) => y.session_id === x.id);
         return {
@@ -860,6 +784,7 @@ function KelolaSesi() {
         }}
       />
       <ClassPicker value={classId} onChange={setClassId} subjectId={subjectId} />
+      {sessionError && <p className="text-destructive">{sessionError.message}</p>}
       {classId && data?.length === 0 && <p className="text-muted-foreground">Belum ada sesi.</p>}
       {data?.map((s) => (
         <SessionRow
