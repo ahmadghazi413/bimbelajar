@@ -7,9 +7,10 @@ import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { safeAuthPath, isRecoveryUrl } from "@/lib/auth-navigation";
 
 type Mode = "masuk" | "daftar" | "lupa";
-const safePath = (p: unknown) => (typeof p === "string" && p.startsWith("/") && !p.startsWith("//") ? p : "/kelas-saya");
+const safePath = safeAuthPath;
 
 export const Route = createFileRoute("/auth")({
   validateSearch: (s: Record<string, unknown>): { redirect?: string } => (typeof s["redirect"] === "string" ? { redirect: s["redirect"] } : {}),
@@ -38,7 +39,10 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (session) navigate({ to: target, replace: true });
+    if (!session || isRecoveryUrl(window.location.hash, window.location.search)) return;
+    const saved = sessionStorage.getItem("after_login");
+    sessionStorage.removeItem("after_login");
+    navigate({ to: saved ? safePath(saved) : target, replace: true });
   }, [session, target, navigate]);
 
   async function submit(e: React.FormEvent) {
@@ -51,7 +55,7 @@ function AuthPage() {
       } else if (mode === "daftar") {
         const { data, error } = await supabase.auth.signUp({
           email, password,
-          options: { emailRedirectTo: window.location.origin + target, data: { full_name: name } },
+          options: { emailRedirectTo: window.location.origin, data: { full_name: name } },
         });
         if (error) throw error;
         if (!data.session) toast.success("Cek email Anda untuk konfirmasi akun, lalu masuk.");
@@ -69,15 +73,15 @@ function AuthPage() {
   }
 
   async function google() {
-    if (redirect) sessionStorage.setItem("after_login", target);
-    const r = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/auth" });
-    if (r.error) toast.error("Gagal masuk dengan Google.");
+    setBusy(true);
+    sessionStorage.setItem("after_login", target);
+    try {
+      const r = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/auth" });
+      if (r.error) throw r.error;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal masuk dengan Google.");
+    } finally { setBusy(false); }
   }
-
-  useEffect(() => {
-    const saved = sessionStorage.getItem("after_login");
-    if (session && saved) { sessionStorage.removeItem("after_login"); navigate({ to: safePath(saved), replace: true }); }
-  }, [session, navigate]);
 
   const title = { masuk: "Assalamu'alaikum, silakan masuk", daftar: "Buat akun baru", lupa: "Lupa password" }[mode];
 
@@ -102,7 +106,7 @@ function AuthPage() {
       {mode !== "lupa" && (
         <>
           <div className="my-5 text-center text-sm text-muted-foreground">atau</div>
-          <Button variant="outline" size="lg" className="w-full" onClick={google}>Lanjut dengan Google</Button>
+          <Button variant="outline" size="lg" className="w-full" onClick={google} disabled={busy}>Lanjut dengan Google</Button>
         </>
       )}
       <div className="mt-6 space-y-2 text-center text-sm">
