@@ -3,12 +3,14 @@ import { CalendarDays, GraduationCap, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { packageUnit, rupiah } from "@/lib/format";
 import type { Tables } from "@/integrations/supabase/types";
+import { TeacherIdentity } from "@/components/TeacherIdentity";
 
 export function ClassCard({ c }: { c: Tables<"classes"> }) {
   return (
     <div className="flex flex-col rounded-3xl border bg-card p-6 shadow-sm">
       <h3 className="text-2xl font-semibold text-primary">{c.name}</h3>
       <p className="mt-1 text-muted-foreground">{c.tagline}</p>
+      <TeacherIdentity teacherId={c.teacher_id} />
       <ul className="mt-4 space-y-2 text-sm">
         <li className="flex items-center gap-2"><GraduationCap className="h-4 w-4 text-primary" /> {c.levels_label}</li>
         <li className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-primary" /> {c.schedule}</li>

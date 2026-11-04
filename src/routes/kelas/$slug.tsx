@@ -4,6 +4,7 @@ import { CalendarDays, Target, Users } from "lucide-react";
 import { classDetailQuery } from "@/lib/queries";
 import { packageUnit, rupiah } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { TeacherIdentity } from "@/components/TeacherIdentity";
 
 export const Route = createFileRoute("/kelas/$slug")({
   loader: async ({ context, params }) => {
@@ -37,6 +38,7 @@ function Detail() {
         Level {c.level_number} · {c.level_label}
       </p>
       <p className="mt-2 text-lg text-muted-foreground">{c.tagline}</p>
+      <TeacherIdentity teacherId={c.teacher_id} />
 
       <div className="mt-6 grid gap-3 rounded-2xl bg-secondary p-5 text-secondary-foreground">
         <p className="flex items-center gap-2"><CalendarDays className="h-5 w-5" /> {c.schedule}</p>

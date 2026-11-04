@@ -40,6 +40,8 @@ function AuthPage() {
 
   useEffect(() => {
     if (!session || isRecoveryUrl(window.location.hash, window.location.search)) return;
+    const recovery = Number(sessionStorage.getItem("password_recovery") || 0);
+    if (recovery > 0 && Date.now() - recovery < 30 * 60 * 1000) { navigate({ to: "/reset-password", replace: true }); return; }
     const saved = sessionStorage.getItem("after_login");
     sessionStorage.removeItem("after_login");
     navigate({ to: saved ? safePath(saved) : target, replace: true });

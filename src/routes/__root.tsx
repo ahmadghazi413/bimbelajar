@@ -127,6 +127,7 @@ function RootComponent() {
 
   useEffect(() => {
     const recovery = () => {
+      if (isRecoveryUrl(window.location.hash, window.location.search)) sessionStorage.setItem("password_recovery", String(Date.now()));
       if (window.location.pathname !== "/reset-password" && isRecoveryUrl(window.location.hash, window.location.search)) {
         window.location.replace(`/reset-password${window.location.search}${window.location.hash}`);
         return true;
@@ -135,7 +136,11 @@ function RootComponent() {
     };
     recovery();
     const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") { recovery(); return; }
+      if (event === "PASSWORD_RECOVERY") {
+        sessionStorage.setItem("password_recovery", String(Date.now()));
+        if (!recovery() && window.location.pathname !== "/reset-password") router.navigate({ to: "/reset-password", replace: true });
+        return;
+      }
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
       router.invalidate();
       if (event !== "SIGNED_OUT") queryClient.invalidateQueries();

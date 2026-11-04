@@ -28,7 +28,8 @@ function Reset() {
   const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
   useEffect(() => {
-    const recovery = isRecoveryUrl(window.location.hash, window.location.search);
+    const marker = Number(sessionStorage.getItem("password_recovery") || 0);
+    const recovery = isRecoveryUrl(window.location.hash, window.location.search) || (marker > 0 && Date.now() - marker < 30 * 60 * 1000);
     supabase.auth.getUser().then(({ data, error }) => {
       setReady(recovery && !!data.user && !error);
       setChecking(false);
@@ -41,6 +42,7 @@ function Reset() {
     const { error } = await supabase.auth.updateUser({ password: pw });
     setBusy(false);
     if (error) { toast.error(error.message); return; }
+    sessionStorage.removeItem("password_recovery");
     toast.success("Password berhasil diganti.");
     navigate({ to: "/kelas-saya" });
   }
