@@ -382,7 +382,6 @@ type ClassForm = Partial<Tables<"classes">> & {
   package_weeks?: number;
   package_sessions?: number;
 };
-
 function KelolaKelas() {
   const { data } = useClasses();
   const { data: settings } = useQuery(settingsQuery);
@@ -404,7 +403,8 @@ function KelolaKelas() {
       description: rest.description ?? "",
       goals: rest.goals ?? "",
       schedule: rest.schedule ?? "Setiap Jumat Pukul 19:30 - 21:00 WIB",
-      quota: Number(rest.quota ?? 10),
+      quota: Number(rest.quota ?? 15),
+      target_gender: (rest as any).target_gender || "all",
       price: Number(rest.price ?? 0),
       price_prefix: rest.price_prefix ?? "",
       is_active: rest.is_active ?? true,
@@ -456,6 +456,8 @@ function KelolaKelas() {
         onClick={() =>
           setEdit({
             is_active: true,
+            quota: 15,
+            target_gender: "ikhwan",
             level_number: 1,
             level_label: "Pemula (Dari Nol)",
             levels_label: "Level 1 · Pemula (Dari Nol)",
@@ -468,6 +470,7 @@ function KelolaKelas() {
       >
         + Tambah kelas
       </Button>
+
       {data?.map((c) => {
         const pk: string[] = (c as any).allowed_packages ?? ["monthly", "session"];
         const av: number[] = (c as any).available_sessions ?? [4, 8];
@@ -476,18 +479,30 @@ function KelolaKelas() {
           pk.includes("session") ? `Per sesi (pilihan: ${av.join(", ")})` : null,
         ].filter(Boolean).join(" & ");
 
+        const genderLabel =
+          (c as any).target_gender === "ikhwan"
+            ? "Ikhwan (Laki-Laki)"
+            : (c as any).target_gender === "akhwat"
+            ? "Akhwat (Perempuan)"
+            : "Semua / Campur";
+
         return (
-          <div key={c.id} className="rounded-2xl border p-4 flex items-center justify-between gap-3">
+          <div key={c.id} className="rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <div className="font-semibold text-base">{classLevelName(c)}</div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-base">{classLevelName(c)}</span>
+                <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs text-secondary-foreground font-medium">
+                  {genderLabel}
+                </span>
+              </div>
               <div className="text-xs text-muted-foreground mt-0.5">
                 {rupiah(c.price)}/{packageUnit(c)} {c.price_per_session ? `· ${rupiah(c.price_per_session)}/sesi` : ""}
               </div>
               <div className="text-xs text-muted-foreground mt-0.5">Paket: {descPkg || "Belum diatur"}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">Jadwal: {c.schedule}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">Jadwal: {c.schedule} · Kuota: {c.quota || 15} santri</div>
               <div className="text-xs text-muted-foreground mt-0.5">Status: {c.is_active ? "Publik" : "Disembunyikan"}</div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 self-end sm:self-auto">
               <Button
                 variant="outline"
                 size="sm"
@@ -500,6 +515,22 @@ function KelolaKelas() {
                 }
               >
                 Ubah
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  const { id, created_at, slug, ...clone } = c as any;
+                  setEdit({
+                    ...clone,
+                    name: `${clone.name} (Rombel Baru)`,
+                    slug: "",
+                    whatsapp_link: (((c as any).class_private?.[0] ?? (c as any).class_private) as any)?.whatsapp_link ?? "",
+                    zoom_link: (((c as any).class_private?.[0] ?? (c as any).class_private) as any)?.zoom_link ?? "",
+                  });
+                }}
+              >
+                Duplikat
               </Button>
               <AdminDelete
                 name={classLevelName(c)}
@@ -516,114 +547,133 @@ function KelolaKelas() {
       })}
 
       <Dialog open={!!edit} onOpenChange={(o) => !o && setEdit(null)}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] overflow-y-auto max-w-lg">
           <DialogHeader>
-            <DialogTitle>{edit?.id ? "Ubah kelas" : "Kelas baru"}</DialogTitle>
+            <DialogTitle>{edit?.id ? "Ubah kelas" : "Tambah kelas"}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <SubjectPicker
-              value={edit?.subject_id ?? ""}
-              onChange={(v) => setEdit((current) => (current ? { ...current, subject_id: v } : null))}
-            />
-            {f("name", "Nama kelas")}
-            <div className="space-y-1"><Label>Pengajar kelas</Label>
-              <Select value={edit?.teacher_id || "none"} onValueChange={(v) => setEdit({ ...edit, teacher_id: v === "none" ? null : v })}>
-                <SelectTrigger aria-label="Pengajar kelas"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Belum dipilih</SelectItem>{teachers.filter((t) => !edit?.id || teacherHasClass(t, edit.id)).map((t) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
-              </Select><TeacherIdentity teacherId={edit?.teacher_id ?? null} />
-            </div>
-            {f("tagline", "Tagline")}
-            {f("description", "Deskripsi", "area")}
-            {f("goals", "Tujuan", "area")}
-            {f("advantages", "Keunggulan", "area")}
+            <SubjectPicker value={edit?.subject_id ?? ""} onChange={(v) => setEdit({ ...edit, subject_id: v })} />
+            {f("name", "Nama kelas (mis. Tahsin Dewasa)")}
 
-            {/* Tingkat Kelas: 1 Dropdown Praktis */}
+            {/* Pilihan Target Santri */}
             <div className="space-y-1">
-              <Label>Tingkat / Level Kelas</Label>
+              <Label>Target Santri</Label>
               <Select
-                value={String(edit?.level_number ?? 1)}
-                onValueChange={(val) => {
-                  const num = Number(val);
-                  const labels: Record<number, string> = {
-                    1: "Pemula (Dari Nol)",
-                    2: "Menengah (Lancar)",
-                    3: "Lanjutan (Mahir)",
-                  };
-                  const lbl = labels[num] || "Pemula (Dari Nol)";
-                  setEdit({
-                    ...edit,
-                    level_number: num,
-                    level_label: lbl,
-                    levels_label: `Level ${num} · ${lbl}`,
-                  });
-                }}
+                value={(edit as any)?.target_gender || "all"}
+                onValueChange={(val) => setEdit({ ...edit, target_gender: val } as any)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Pilih Level" />
+                  <SelectValue placeholder="Pilih target santri" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">Level 1 — Pemula (Dari Nol)</SelectItem>
-                  <SelectItem value="2">Level 2 — Menengah (Lancar)</SelectItem>
-                  <SelectItem value="3">Level 3 — Lanjutan (Mahir)</SelectItem>
+                  <SelectItem value="all">Semua / Campur</SelectItem>
+                  <SelectItem value="ikhwan">Ikhwan (Laki-Laki)</SelectItem>
+                  <SelectItem value="akhwat">Akhwat (Perempuan)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Jadwal Terstruktur: Hari + Jam Mulai & Selesai */}
-            <div className="space-y-2 rounded-xl border p-3 bg-muted/20">
-              <Label className="font-semibold text-sm">Jadwal Pertemuan</Label>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <div>
-                  <Label className="text-xs text-muted-foreground">Hari</Label>
+            {/* Pilihan Pengajar */}
+            <div className="space-y-1">
+              <Label>Pengajar / Guru</Label>
+              <Select
+                value={edit?.teacher_id || "none"}
+                onValueChange={(val) => setEdit({ ...edit, teacher_id: val === "none" ? null : val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih pengajar kelas" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Belum ditentukan</SelectItem>
+                  {teachers.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name} ({t.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-1">
+              <Label>Tingkat / Level</Label>
+              <Select
+                value={String(edit?.level_number ?? 1)}
+                onValueChange={(val) => {
+                  const num = Number(val);
+                  const label = num === 1 ? "Pemula" : num === 2 ? "Umum" : "Lanjutan";
+                  setEdit({
+                    ...edit,
+                    level_number: num,
+                    level_label: label,
+                    levels_label: `Level ${num} · ${label}`,
+                  });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Pilih tingkat" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="1">Level 1 · Pemula</SelectItem>
+                  <SelectItem value="2">Level 2 · Umum</SelectItem>
+                  <SelectItem value="3">Level 3 · Lanjutan</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {f("tagline", "Tagline singkat")}
+            {f("description", "Deskripsi", "area")}
+            {f("goals", "Target capaian", "area")}
+            {f("advantages", "Keunggulan kelas (pisahkan dengan koma atau baris baru)", "area")}
+
+            {/* Pengaturan Jadwal */}
+            <div className="space-y-2 rounded-xl border p-3 bg-muted/30">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Jadwal Kelas</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs">Hari</Label>
                   <Select
                     defaultValue="Jumat"
-                    onValueChange={(day) => {
+                    onValueChange={(hari) => {
                       const cur = edit?.schedule || "Setiap Jumat Pukul 19:30 - 21:00 WIB";
-                      const match = cur.match(/Pukul\s+(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})/);
-                      const timeStr = match ? `Pukul ${match[1]} - ${match[2]} WIB` : "Pukul 19:30 - 21:00 WIB";
-                      setEdit({ ...edit, schedule: `Setiap ${day} ${timeStr}` });
+                      const jamMatch = cur.match(/Pukul\s+([0-9:.-]+(?:\s*-\s*[0-9:.-]+)?\s*WIB)/i);
+                      const jam = jamMatch ? jamMatch[1] : "19:30 - 21:00 WIB";
+                      setEdit({ ...edit, schedule: `Setiap ${hari} Pukul ${jam}` });
                     }}
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Hari" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Pilih hari" /></SelectTrigger>
                     <SelectContent>
-                      {["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Ahad"].map((d) => (
-                        <SelectItem key={d} value={d}>Setiap {d}</SelectItem>
+                      {["Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu", "Ahad"].map((h) => (
+                        <SelectItem key={h} value={h}>{h}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Jam Mulai</Label>
-                  <Input
-                    type="time"
-                    defaultValue="19:30"
-                    onChange={(e) => {
-                      const st = e.target.value || "19:30";
+                <div className="space-y-1">
+                  <Label className="text-xs">Jam (Mulai - Selesai)</Label>
+                  <Select
+                    defaultValue="19:30 - 21:00 WIB"
+                    onValueChange={(jam) => {
                       const cur = edit?.schedule || "Setiap Jumat Pukul 19:30 - 21:00 WIB";
-                      const dMatch = cur.match(/Setiap\s+([A-Za-z]+)/);
-                      const day = dMatch ? dMatch[1] : "Jumat";
-                      const eMatch = cur.match(/-\s*(\d{2}:\d{2})/);
-                      const et = eMatch ? eMatch[1] : "21:00";
-                      setEdit({ ...edit, schedule: `Setiap ${day} Pukul ${st} - ${et} WIB` });
+                      const hariMatch = cur.match(/Setiap\s+([A-Za-z]+)/i);
+                      const hari = hariMatch ? hariMatch[1] : "Jumat";
+                      setEdit({ ...edit, schedule: `Setiap ${hari} Pukul ${jam}` });
                     }}
-                  />
-                </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Jam Selesai</Label>
-                  <Input
-                    type="time"
-                    defaultValue="21:00"
-                    onChange={(e) => {
-                      const et = e.target.value || "21:00";
-                      const cur = edit?.schedule || "Setiap Jumat Pukul 19:30 - 21:00 WIB";
-                      const dMatch = cur.match(/Setiap\s+([A-Za-z]+)/);
-                      const day = dMatch ? dMatch[1] : "Jumat";
-                      const sMatch = cur.match(/Pukul\s+(\d{2}:\d{2})/);
-                      const st = sMatch ? sMatch[1] : "19:30";
-                      setEdit({ ...edit, schedule: `Setiap ${day} Pukul ${st} - ${et} WIB` });
-                    }}
-                  />
+                  >
+                    <SelectTrigger><SelectValue placeholder="Pilih jam" /></SelectTrigger>
+                    <SelectContent>
+                      {[
+                        "05:30 - 07:00 WIB",
+                        "08:00 - 09:30 WIB",
+                        "09:30 - 11:00 WIB",
+                        "13:30 - 15:00 WIB",
+                        "16:00 - 17:30 WIB",
+                        "19:30 - 21:00 WIB",
+                        "20:00 - 21:30 WIB",
+                      ].map((j) => (
+                        <SelectItem key={j} value={j}>{j}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
@@ -631,62 +681,107 @@ function KelolaKelas() {
               </p>
             </div>
 
-            {f("quota", "Kuota", "number")}
+            {f("quota", "Kuota Maksimal Santri", "number")}
             {f("price_prefix", "Awalan harga (mis. Mulai)")}
             {f("price", "Harga paket (Rp)", "number")}
 
             {/* Pilihan Paket Fleksibel */}
             {(() => {
-              const pk: string[] = (edit as any)?.allowed_packages ?? ["monthly", "session"];
-              const av: number[] = (edit as any)?.available_sessions ?? [4, 8];
-              const togglePk = (k: string) => {
-                const next = pk.includes(k) ? pk.filter((x) => x !== k) : [...pk, k];
+              const currentAllowed: string[] = (edit as any)?.allowed_packages ?? ["monthly"];
+              const isMonthly = currentAllowed.includes("monthly");
+              const isSession = currentAllowed.includes("session");
+              const currentSessions: number[] = (edit as any)?.available_sessions ?? [4, 8];
+
+              const togglePkg = (type: "monthly" | "session") => {
+                let next = [...currentAllowed];
+                if (next.includes(type)) {
+                  if (next.length === 1) {
+                    toast.error("Minimal satu jenis paket harus aktif.");
+                    return;
+                  }
+                  next = next.filter((x) => x !== type);
+                } else {
+                  next.push(type);
+                }
                 setEdit({ ...edit, allowed_packages: next } as any);
               };
-              const toggleN = (n: number) => {
-                const next = av.includes(n) ? av.filter((x) => x !== n) : [...av, n].sort((a, b) => a - b);
+
+              const toggleSessionOption = (val: number) => {
+                let next = [...currentSessions];
+                if (next.includes(val)) {
+                  if (next.length === 1) {
+                    toast.error("Pilih minimal satu pilihan sesi.");
+                    return;
+                  }
+                  next = next.filter((x) => x !== val);
+                } else {
+                  next.push(val);
+                }
+                next.sort((a, b) => a - b);
                 setEdit({ ...edit, available_sessions: next } as any);
               };
+
               return (
-                <div className="space-y-3 rounded-2xl border p-3">
-                  <Label>Paket yang dibuka untuk murid</Label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={pk.includes("monthly")} onChange={() => togglePk("monthly")} /> Bulanan
-                  </label>
-                  {pk.includes("monthly") && (
-                    <Select
-                      value={String(edit?.package_weeks || 4)}
-                      onValueChange={(v) => setEdit({ ...edit, package_weeks: Number(v) })}
-                    >
-                      <SelectTrigger aria-label="Durasi"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">1 minggu</SelectItem>
-                        <SelectItem value="2">2 minggu</SelectItem>
-                        <SelectItem value="3">3 minggu</SelectItem>
-                        <SelectItem value="4">1 bulan</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                  <label className="flex items-center gap-2 text-sm">
-                    <input type="checkbox" checked={pk.includes("session")} onChange={() => togglePk("session")} /> Per sesi
-                  </label>
-                  {pk.includes("session") && (
-                    <>
-                      {f("price_per_session" as any, "Harga per sesi (Rp)", "number")}
-                      <p className="text-xs text-muted-foreground">Centang jumlah sesi yang boleh dipilih murid:</p>
-                      <div className="grid grid-cols-6 gap-1.5">
-                        {Array.from({ length: 30 }, (_, i) => i + 1).map((n) => (
-                          <button
-                            key={n}
-                            type="button"
-                            onClick={() => toggleN(n)}
-                            className={`rounded-lg border py-1.5 text-xs font-semibold ${av.includes(n) ? "border-primary bg-primary text-primary-foreground" : "bg-background"}`}
-                          >
-                            {n}
-                          </button>
-                        ))}
+                <div className="space-y-3 rounded-xl border p-3 bg-muted/20">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Opsi Pembayaran untuk Murid
+                  </Label>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="rounded"
+                        checked={isMonthly}
+                        onChange={() => togglePkg("monthly")}
+                      />
+                      <span className="text-sm font-medium">Paket Bulanan (4 Minggu)</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="rounded"
+                        checked={isSession}
+                        onChange={() => togglePkg("session")}
+                      />
+                      <span className="text-sm font-medium">Paket Per Sesi</span>
+                    </label>
+                  </div>
+
+                  {isSession && (
+                    <div className="mt-3 pt-3 border-t space-y-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Harga per Sesi (Rp)</Label>
+                        <Input
+                          type="number"
+                          placeholder="mis. 50000"
+                          value={String((edit as any)?.price_per_session ?? "")}
+                          onChange={(e) => setEdit({ ...edit, price_per_session: Number(e.target.value) } as any)}
+                        />
                       </div>
-                    </>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Jumlah sesi yang bisa dipilih murid:</Label>
+                        <div className="flex flex-wrap gap-2">
+                          {[1, 2, 4, 6, 8, 10, 12, 16, 20, 24].map((num) => {
+                            const active = currentSessions.includes(num);
+                            return (
+                              <button
+                                key={num}
+                                type="button"
+                                onClick={() => toggleSessionOption(num)}
+                                className={`px-2.5 py-1 text-xs rounded-md border font-medium transition ${
+                                  active
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "bg-background text-muted-foreground hover:bg-muted"
+                                }`}
+                              >
+                                {num} Sesi
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
               );
