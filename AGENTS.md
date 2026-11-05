@@ -19,3 +19,5 @@
 - Session publication is enforced by RLS on sessions and recordings; admin queries retain access to drafts while student views only receive published sessions.
 - Payment proofs use unique private storage paths and an ownership-validating submit RPC; admin deletion removes the file then conditionally clears its matching pointer, never payment status or history. Shared proof controls prefetch a Blob for previews and activation-safe downloads.
 - Payment uploads are staged privately before confirmation; only the explicit confirmation action creates the enrollment and attaches its proof through the existing ownership-validating RPC.
+- Account signup and old-password changes use shared client/server schemas and isolated publishable auth clients; password changes authenticate the supplied credentials without replacing the browser session.
+- Signup metadata populates profile contact fields through the existing auth lifecycle trigger so unconfirmed accounts retain their registration details.
