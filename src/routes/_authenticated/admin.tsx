@@ -396,6 +396,18 @@ function KelolaKelas() {
       return;
     }
     const { whatsapp_link = "", zoom_link = "", ...rest } = edit;
+    const pkgs: string[] = (rest as any).allowed_packages?.length ? (rest as any).allowed_packages : ["monthly"];
+    const hasMonthly = pkgs.includes("monthly");
+    const hasSession = pkgs.includes("session");
+    const sessionOnly = hasSession && !hasMonthly;
+    if (hasMonthly && !(Number(rest.price) > 0)) {
+      toast.error("Isi harga Paket Bulanan.");
+      return;
+    }
+    if (hasSession && !(Number((rest as any).price_per_session) > 0)) {
+      toast.error("Isi harga per sesi untuk Paket Per Sesi.");
+      return;
+    }
     const payload: any = {
       slug: rest.slug || slugify(rest.name ?? "", "kelas"),
       name: rest.name ?? "",
@@ -405,15 +417,16 @@ function KelolaKelas() {
       schedule: rest.schedule ?? "Setiap Jumat Pukul 19:30 - 21:00 WIB",
       quota: Number(rest.quota ?? 15),
       target_gender: (rest as any).target_gender || "all",
-      price: Number(rest.price ?? 0),
+      // Jika hanya Paket Per Sesi yang aktif, harga tampilan kelas = harga 1 sesi
+      price: sessionOnly ? Number((rest as any).price_per_session) : Number(rest.price ?? 0),
       price_prefix: rest.price_prefix ?? "",
       is_active: rest.is_active ?? true,
-      allowed_packages: (rest as any).allowed_packages?.length ? (rest as any).allowed_packages : ["monthly"],
+      allowed_packages: pkgs,
       available_sessions: (rest as any).available_sessions ?? [4, 8],
       price_per_session: Number((rest as any).price_per_session ?? 0),
-      package_type: (rest as any).allowed_packages?.length === 1 && (rest as any).allowed_packages[0] === "session" ? "session" : "monthly",
+      package_type: sessionOnly ? "session" : "monthly",
       package_weeks: Number(rest.package_weeks || 4),
-      package_sessions: Number((rest as any).available_sessions?.[0] ?? 4),
+      package_sessions: sessionOnly ? 1 : Number((rest as any).available_sessions?.[0] ?? 4),
       sort_order: rest.sort_order ?? 99,
       subject_id: edit.subject_id,
       level_number: Number(rest.level_number ?? 1),
@@ -473,10 +486,9 @@ function KelolaKelas() {
 
       {data?.map((c) => {
         const pk: string[] = (c as any).allowed_packages ?? ["monthly", "session"];
-        const av: number[] = (c as any).available_sessions ?? [4, 8];
         const descPkg = [
-          pk.includes("monthly") ? "Bulanan" : null,
-          pk.includes("session") ? `Per sesi (pilihan: ${av.join(", ")})` : null,
+          pk.includes("monthly") ? `Bulanan ${rupiah(c.price)}` : null,
+          pk.includes("session") ? `Per sesi ${rupiah((c as any).price_per_session || 0)}/sesi (1–30 sesi)` : null,
         ].filter(Boolean).join(" & ");
 
         const genderLabel =
@@ -496,7 +508,7 @@ function KelolaKelas() {
                 </span>
               </div>
               <div className="text-xs text-muted-foreground mt-0.5">
-                {rupiah(c.price)}/{packageUnit(c)} {c.price_per_session ? `· ${rupiah(c.price_per_session)}/sesi` : ""}
+                {rupiah(c.price)}/{packageUnit(c)} {c.price_per_session && pk.includes("monthly") ? `· ${rupiah(c.price_per_session)}/sesi` : ""}
               </div>
               <div className="text-xs text-muted-foreground mt-0.5">Paket: {descPkg || "Belum diatur"}</div>
               <div className="text-xs text-muted-foreground mt-0.5">Jadwal: {c.schedule} · Kuota: {c.quota || 15} santri</div>
@@ -683,14 +695,12 @@ function KelolaKelas() {
 
             {f("quota", "Kuota Maksimal Santri", "number")}
             {f("price_prefix", "Awalan harga (mis. Mulai)")}
-            {f("price", "Harga paket (Rp)", "number")}
 
             {/* Pilihan Paket Fleksibel */}
             {(() => {
               const currentAllowed: string[] = (edit as any)?.allowed_packages ?? ["monthly"];
               const isMonthly = currentAllowed.includes("monthly");
               const isSession = currentAllowed.includes("session");
-              const currentSessions: number[] = (edit as any)?.available_sessions ?? [4, 8];
 
               const togglePkg = (type: "monthly" | "session") => {
                 let next = [...currentAllowed];
@@ -704,21 +714,6 @@ function KelolaKelas() {
                   next.push(type);
                 }
                 setEdit({ ...edit, allowed_packages: next } as any);
-              };
-
-              const toggleSessionOption = (val: number) => {
-                let next = [...currentSessions];
-                if (next.includes(val)) {
-                  if (next.length === 1) {
-                    toast.error("Pilih minimal satu pilihan sesi.");
-                    return;
-                  }
-                  next = next.filter((x) => x !== val);
-                } else {
-                  next.push(val);
-                }
-                next.sort((a, b) => a - b);
-                setEdit({ ...edit, available_sessions: next } as any);
               };
 
               return (
@@ -736,6 +731,17 @@ function KelolaKelas() {
                       />
                       <span className="text-sm font-medium">Paket Bulanan (4 Minggu)</span>
                     </label>
+                    {isMonthly && (
+                      <div className="ml-6 space-y-1">
+                        <Label className="text-xs">Harga Paket Bulanan (Rp)</Label>
+                        <Input
+                          type="number"
+                          placeholder="mis. 200000"
+                          value={String(edit?.price ?? "")}
+                          onChange={(e) => setEdit({ ...edit, price: Number(e.target.value) } as any)}
+                        />
+                      </div>
+                    )}
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
@@ -759,28 +765,9 @@ function KelolaKelas() {
                         />
                       </div>
 
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Jumlah sesi yang bisa dipilih murid:</Label>
-                        <div className="flex flex-wrap gap-2">
-                          {[1, 2, 4, 6, 8, 10, 12, 16, 20, 24].map((num) => {
-                            const active = currentSessions.includes(num);
-                            return (
-                              <button
-                                key={num}
-                                type="button"
-                                onClick={() => toggleSessionOption(num)}
-                                className={`px-2.5 py-1 text-xs rounded-md border font-medium transition ${
-                                  active
-                                    ? "bg-primary text-primary-foreground border-primary"
-                                    : "bg-background text-muted-foreground hover:bg-muted"
-                                }`}
-                              >
-                                {num} Sesi
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Murid bebas memilih <b>1 sampai 30 sesi</b>. Total bayar = jumlah sesi × harga per sesi.
+                      </p>
                     </div>
                   )}
                 </div>
