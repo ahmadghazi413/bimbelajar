@@ -50,3 +50,34 @@ function IlmuPage() {
       )}
 
       <h2 className="mt-8 text-xl font-bold text-foreground">Pilih Kelas</h2>
+      {classes.length > 0 ? (
+        <>
+          <Carousel opts={{ align: "start" }} className="mt-4">
+            <CarouselContent className="-ml-4">
+              {classes.map((c) => (
+                <CarouselItem key={c.id} className="basis-[88%] pl-4 sm:basis-1/2">
+                  <div className="h-full [&>div]:h-full">
+                    <ClassCard c={c} />
+                  </div>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+            {classes.length > 1 && (
+              <>
+                <CarouselPrevious className="left-2 hidden sm:inline-flex" />
+                <CarouselNext className="right-2 hidden sm:inline-flex" />
+              </>
+            )}
+          </Carousel>
+          {classes.length > 1 && (
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              Geser ke kanan untuk melihat kelas lainnya →
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="mt-4 text-muted-foreground">Belum ada kelas yang tersedia untuk ilmu ini.</p>
+      )}
+    </div>
+  );
+}
