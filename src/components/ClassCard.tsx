@@ -16,7 +16,13 @@ export function ClassCard({ c }: { c: Tables<"classes"> }) {
         <div className="flex flex-wrap items-start justify-between gap-2">
           <h3 className="text-xl font-bold leading-snug text-primary sm:text-2xl">{c.name}</h3>
           {genderLabel && (
-            <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${targetGender === "akhwat" ? "bg-rose-50 text-rose-700 ring-1 ring-rose-200" : "bg-sky-50 text-sky-700 ring-1 ring-sky-200"}`}>
+            <span
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                targetGender === "akhwat"
+                  ? "bg-rose-50 text-rose-700 ring-1 ring-rose-200"
+                  : "bg-sky-50 text-sky-700 ring-1 ring-sky-200"
+              }`}
+            >
               {genderLabel}
             </span>
           )}
