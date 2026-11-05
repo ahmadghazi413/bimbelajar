@@ -1644,6 +1644,20 @@ function Pengaturan() {
     qc.invalidateQueries();
   }
 
+  async function savePaymentMode(mode: "both" | "ipaymu" | "manual") {
+    setBusy(true);
+    const { error } = await supabase.from("settings").upsert({ key: "payment_mode", value: mode });
+    setBusy(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setVals((v) => ({ ...v, payment_mode: mode }));
+    toast.success("Metode pembayaran diperbarui.");
+    qc.invalidateQueries({ queryKey: ["settings"] });
+    qc.invalidateQueries({ queryKey: ["admin-settings"] });
+  }
+
   async function uploadApk(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1702,6 +1716,37 @@ function Pengaturan() {
       <Button onClick={saveSettings} disabled={busy}>
         Simpan pengaturan
       </Button>
+
+      {/* Metode pembayaran yang ditampilkan ke murid */}
+      <div className="space-y-2 rounded-2xl border p-4">
+        <Label className="font-semibold">Metode pembayaran untuk murid</Label>
+        <p className="text-xs text-muted-foreground">
+          Pilih cara bayar yang boleh dipakai murid di halaman pendaftaran. Tersimpan otomatis saat dipilih.
+        </p>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {([
+            { v: "both", t: "Keduanya", d: "iPaymu & transfer manual" },
+            { v: "ipaymu", t: "Hanya iPaymu", d: "Otomatis (QRIS / VA)" },
+            { v: "manual", t: "Hanya Manual", d: "Transfer + bukti bayar" },
+          ] as const).map((o) => {
+            const active = (["ipaymu", "manual"].includes(vals["payment_mode"]) ? vals["payment_mode"] : "both") === o.v;
+            return (
+              <button
+                key={o.v}
+                type="button"
+                disabled={busy}
+                onClick={() => savePaymentMode(o.v)}
+                className={`rounded-2xl border p-3 text-left transition ${
+                  active ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20" : "border-border hover:bg-secondary"
+                }`}
+              >
+                <div className="text-sm font-bold">{o.t}</div>
+                <div className="text-[11px] text-muted-foreground">{o.d}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Bagian Upload Logo */}
       <div className="rounded-2xl border border-dashed p-4">
