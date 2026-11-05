@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Landmark, MessageCircle, Minus, Plus, QrCode, Upload, Zap, CreditCard } from "lucide-react";
+import { Landmark, MessageCircle, QrCode, Upload, Zap, CreditCard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { classDetailQuery, settingsQuery } from "@/lib/queries";
 import { packageUnit, rupiah } from "@/lib/format";
@@ -37,9 +37,6 @@ async function qrisUrl(path: string) {
   const { data } = await supabase.storage.from("payment-proofs").createSignedUrl(path, 3600);
   return data?.signedUrl ?? "";
 }
-
-const MIN_SESSIONS = 1;
-const MAX_SESSIONS = 30;
 
 function Bayar() {
   const { slug } = Route.useParams();
@@ -101,16 +98,11 @@ function Bayar() {
   const allowed = cx.allowed_packages?.length ? cx.allowed_packages : ["monthly"];
   const bought = progress.data?.bought ?? 0;
   const remaining = Math.max((progress.data?.total ?? 0) - bought, 0);
-  // Pilihan cepat hanya untuk top-up sisa sesi; selebihnya murid bebas memilih 1–30.
-  const sessionOptions = bought > 0 && remaining > 0 ? [remaining] : [];
+  const sessionOptions = [
+    ...new Set([...(cx.available_sessions ?? []), ...(bought > 0 && remaining > 0 ? [remaining] : [])]),
+  ].sort((a, b) => a - b);
   const effType: "monthly" | "session" = allowed.includes(packageType) ? packageType : (allowed[0] as any);
-  const effSessions =
-    Number.isInteger(selectedSessions) &&
-    ((selectedSessions >= MIN_SESSIONS && selectedSessions <= MAX_SESSIONS) || sessionOptions.includes(selectedSessions))
-      ? selectedSessions
-      : MIN_SESSIONS;
-  const stepSessions = (delta: number) =>
-    setSelectedSessions(Math.min(MAX_SESSIONS, Math.max(MIN_SESSIONS, effSessions + delta)));
+  const effSessions = sessionOptions.includes(selectedSessions) ? selectedSessions : (sessionOptions[0] ?? 0);
 
   // Metode pembayaran yang diizinkan admin: both | ipaymu | manual
   const payMode = settings?.["payment_mode"] === "ipaymu" || settings?.["payment_mode"] === "manual"
@@ -377,50 +369,18 @@ function Bayar() {
           </div>
 
           )}
-          {/* Jika Paket Sesi Dipilih: pilih bebas 1-30 sesi */}
+          {/* Jika Paket Sesi Dipilih: murid memilih dari jumlah sesi yang dikeluarkan admin */}
           {effType === "session" && (
-            <div className="space-y-3 rounded-2xl bg-secondary/40 p-3">
-              <Label className="text-xs font-semibold">Pilih Jumlah Pertemuan / Sesi (1–{MAX_SESSIONS}):</Label>
-              <div className="flex items-center justify-center gap-3">
-                <Button type="button" variant="outline" size="icon" className="h-10 w-10 rounded-full"
-                  disabled={effSessions <= MIN_SESSIONS} onClick={() => stepSessions(-1)}>
-                  <Minus className="h-4 w-4" />
-                </Button>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  min={MIN_SESSIONS}
-                  max={MAX_SESSIONS}
-                  value={effSessions}
-                  onChange={(ev) => {
-                    const n = Math.round(Number(ev.target.value));
-                    if (Number.isFinite(n)) setSelectedSessions(Math.min(MAX_SESSIONS, Math.max(MIN_SESSIONS, n)));
-                  }}
-                  className="h-10 w-20 text-center text-lg font-bold"
-                />
-                <Button type="button" variant="outline" size="icon" className="h-10 w-10 rounded-full"
-                  disabled={effSessions >= MAX_SESSIONS} onClick={() => stepSessions(1)}>
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-              <input
-                type="range"
-                min={MIN_SESSIONS}
-                max={MAX_SESSIONS}
-                step={1}
-                value={Math.min(effSessions, MAX_SESSIONS)}
-                onChange={(ev) => setSelectedSessions(Number(ev.target.value))}
-                className="w-full accent-[hsl(var(--primary))]"
-                aria-label="Jumlah sesi"
-              />
-              {sessionOptions.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
+            <div className="space-y-2 rounded-2xl bg-secondary/40 p-3">
+              <Label className="text-xs font-semibold">Pilih Jumlah Pertemuan / Sesi:</Label>
+              {sessionOptions.length > 0 ? (
+                <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
                   {sessionOptions.map((num) => (
                     <button
                       key={num}
                       type="button"
                       onClick={() => setSelectedSessions(num)}
-                      className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition ${
+                      className={`rounded-xl py-2 text-xs font-bold transition border ${
                         effSessions === num
                           ? "bg-primary text-primary-foreground border-primary shadow-sm"
                           : "bg-background border-border hover:bg-secondary"
@@ -430,9 +390,11 @@ function Bayar() {
                     </button>
                   ))}
                 </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Belum ada pilihan sesi untuk kelas ini.</p>
               )}
               <p className="text-xs text-muted-foreground">
-                {effSessions} sesi × {rupiah(sessionPrice)} = <b>{rupiah(basePrice)}</b>
+                Paket {effSessions} Sesi: <b>{rupiah(basePrice)}</b>
               </p>
             </div>
           )}
