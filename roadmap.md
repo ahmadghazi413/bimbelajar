@@ -1,4 +1,9 @@
 # Referral
+## Akun email dan password
+- [ ] Hapus masuk Google; daftar dengan nama lengkap, email, password, dan nomor WhatsApp.
+- [ ] Password baru 8–64 karakter dengan huruf dan angka.
+- [ ] Ganti password di web dengan email, password lama, password baru, dan konfirmasi; sediakan bantuan admin.
+- [ ] Uji validasi dan alur perubahan password.
 ## Perbaikan November
 - [ ] Periksa dan perbaiki login Google dan tujuan reset password.
 - [ ] Checklist ilmu/kelas guru dan uji akses semua kelas.
