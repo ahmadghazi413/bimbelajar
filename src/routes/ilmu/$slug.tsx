@@ -38,7 +38,7 @@ function IlmuPage() {
   const classes = data.classes.filter((c) => c.is_active !== false);
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
+    <div className="mx-auto max-w-5xl px-4 py-8">
       <Link to="/kelas" className="text-sm font-medium text-primary hover:underline">
         ← Semua ilmu
       </Link>
@@ -52,10 +52,10 @@ function IlmuPage() {
       <h2 className="mt-8 text-xl font-bold text-foreground">Pilih Kelas</h2>
       {classes.length > 0 ? (
         <>
-          <Carousel opts={{ align: "start" }} className="mt-4">
+          <Carousel opts={{ align: "start", slidesToScroll: 1 }} className="mt-4 px-0 sm:px-6">
             <CarouselContent className="-ml-4">
               {classes.map((c) => (
-                <CarouselItem key={c.id} className="basis-[88%] pl-4 sm:basis-1/2">
+                <CarouselItem key={c.id} className="basis-[88%] pl-4 sm:basis-1/2 lg:basis-1/3">
                   <div className="h-full [&>div]:h-full">
                     <ClassCard c={c} />
                   </div>
@@ -64,8 +64,8 @@ function IlmuPage() {
             </CarouselContent>
             {classes.length > 1 && (
               <>
-                <CarouselPrevious className="left-2 hidden sm:inline-flex" />
-                <CarouselNext className="right-2 hidden sm:inline-flex" />
+                <CarouselPrevious className="-left-1 hidden h-9 w-9 sm:inline-flex" />
+                <CarouselNext className="-right-1 hidden h-9 w-9 sm:inline-flex" />
               </>
             )}
           </Carousel>
