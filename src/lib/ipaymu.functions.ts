@@ -20,6 +20,12 @@ export const createIpaymuPayment = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId, claims } = context;
 
+    // Admin bisa menonaktifkan iPaymu (setting payment_mode = "manual")
+    const { data: modeRow } = await supabase.from("settings").select("value").eq("key", "payment_mode").maybeSingle();
+    if (modeRow?.value?.trim() === "manual") {
+      throw new Error("Pembayaran otomatis (iPaymu) sedang dinonaktifkan admin. Gunakan transfer manual.");
+    }
+
     // Pendaftaran dibuat atas nama user yang sedang login
     const { data: enr, error } = await supabase
       .from("enrollments")
