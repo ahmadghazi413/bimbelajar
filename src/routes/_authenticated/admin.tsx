@@ -385,10 +385,12 @@ type ClassForm = Partial<Tables<"classes">> & {
 };
 function KelolaKelas() {
   const { data } = useClasses();
+  const { data: subjects = [] } = useSubjects();
   const { data: settings } = useQuery(settingsQuery);
   const teachers = parseTeachers(settings?.["teacher_list"]);
   const qc = useQueryClient();
   const [edit, setEdit] = useState<ClassForm | null>(null);
+  const [subjectFilter, setSubjectFilter] = useState("all");
   const [genderFilter, setGenderFilter] = useState<"all" | "ikhwan" | "akhwat">("all");
 
   async function save() {
@@ -468,41 +470,68 @@ function KelolaKelas() {
 
   return (
     <div className="mt-4 space-y-3">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div className="space-y-1">
-          <Label>Filter target kelas</Label>
-          <Select value={genderFilter} onValueChange={(v) => setGenderFilter(v as "all" | "ikhwan" | "akhwat")}>
-            <SelectTrigger className="w-full sm:w-56"><SelectValue placeholder="Semua target" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua target</SelectItem>
-              <SelectItem value="ikhwan">Ikhwan</SelectItem>
-              <SelectItem value="akhwat">Akhwat</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <Button
-        onClick={() =>
-          setEdit({
-            is_active: true,
-            quota: 15,
-            target_gender: "ikhwan",
-            level_number: 1,
-            level_label: "Pemula (Dari Nol)",
-            levels_label: "Level 1 · Pemula (Dari Nol)",
-            package_type: "monthly",
-            package_weeks: 4,
-            package_sessions: 4,
-            available_months: [1, 2, 3, 6, 12],
-            available_sessions: [4, 8],
-            schedule: "Setiap Jumat Pukul 19:30 - 21:00 WIB",
-          })
-        }
-      >
-        + Tambah kelas
-        </Button>
-      </div>
+     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+  <div className="grid gap-3 sm:grid-cols-2 flex-1">
+    <div className="space-y-1">
+      <Label>Filter Ilmu</Label>
+      <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+        <SelectTrigger>
+          <SelectValue placeholder="Semua ilmu" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Semua ilmu</SelectItem>
+          {subjects.map((s) => (
+            <SelectItem key={s.id} value={s.id}>
+              {s.name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
 
-      {(data ?? []).filter((c) => genderFilter === "all" || (c as any).target_gender === genderFilter).map((c) => {
+    <div className="space-y-1">
+      <Label>Filter Gender</Label>
+      <Select
+        value={genderFilter}
+        onValueChange={(v) => setGenderFilter(v as "all" | "ikhwan" | "akhwat")}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="Semua target" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Semua target</SelectItem>
+          <SelectItem value="ikhwan">Ikhwan</SelectItem>
+          <SelectItem value="akhwat">Akhwat</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  </div>
+
+  <Button
+    onClick={() =>
+      setEdit({
+        is_active: true,
+        quota: 15,
+        target_gender: "ikhwan",
+        level_number: 1,
+        level_label: "Pemula (Dari Nol)",
+        levels_label: "Level 1 · Pemula (Dari Nol)",
+        package_type: "monthly",
+        package_weeks: 4,
+        package_sessions: 4,
+        available_months: [1, 2, 3, 6, 12],
+        available_sessions: [4, 8],
+        schedule: "Setiap Jumat Pukul 19:30 - 21:00 WIB",
+      })
+    }
+  >
+    + Tambah kelas
+  </Button>
+</div>
+      {(data ?? [])
+  .filter((c) => subjectFilter === "all" || c.subject_id === subjectFilter)
+  .filter((c) => genderFilter === "all" || (c as any).target_gender === genderFilter)
+  .map((c) => {
         const pk: string[] = (c as any).allowed_packages ?? ["monthly", "session"];
         const av: number[] = (c as any).available_sessions ?? [4, 8];
         const descPkg = [
