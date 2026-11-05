@@ -486,9 +486,10 @@ function KelolaKelas() {
 
       {data?.map((c) => {
         const pk: string[] = (c as any).allowed_packages ?? ["monthly", "session"];
+        const av: number[] = (c as any).available_sessions ?? [4, 8];
         const descPkg = [
           pk.includes("monthly") ? `Bulanan ${rupiah(c.price)}` : null,
-          pk.includes("session") ? `Per sesi ${rupiah((c as any).price_per_session || 0)}/sesi (1–30 sesi)` : null,
+          pk.includes("session") ? `Per sesi ${rupiah((c as any).price_per_session || 0)}/sesi (pilihan: ${av.join(", ")} sesi)` : null,
         ].filter(Boolean).join(" & ");
 
         const genderLabel =
@@ -702,6 +703,22 @@ function KelolaKelas() {
               const isMonthly = currentAllowed.includes("monthly");
               const isSession = currentAllowed.includes("session");
 
+              const currentSessions: number[] = (edit as any)?.available_sessions ?? [4, 8];
+              const toggleSessionOption = (val: number) => {
+                let next = [...currentSessions];
+                if (next.includes(val)) {
+                  if (next.length === 1) {
+                    toast.error("Pilih minimal satu pilihan sesi.");
+                    return;
+                  }
+                  next = next.filter((x) => x !== val);
+                } else {
+                  next.push(val);
+                }
+                next.sort((a, b) => a - b);
+                setEdit({ ...edit, available_sessions: next } as any);
+              };
+
               const togglePkg = (type: "monthly" | "session") => {
                 let next = [...currentAllowed];
                 if (next.includes(type)) {
@@ -765,9 +782,42 @@ function KelolaKelas() {
                         />
                       </div>
 
-                      <p className="text-xs text-muted-foreground">
-                        Murid bebas memilih <b>1 sampai 30 sesi</b>. Total bayar = jumlah sesi × harga per sesi.
-                      </p>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <Label className="text-xs">Jumlah sesi yang dikeluarkan untuk murid (1–30):</Label>
+                          <div className="flex gap-1">
+                            <button
+                              type="button"
+                              className="rounded-md border px-2 py-0.5 text-[11px] font-medium hover:bg-muted"
+                              onClick={() => setEdit({ ...edit, available_sessions: Array.from({ length: 30 }, (_, i) => i + 1) } as any)}
+                            >
+                              Pilih semua (1–30)
+                            </button>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-5 sm:grid-cols-6 gap-1.5">
+                          {Array.from({ length: 30 }, (_, i) => i + 1).map((num) => {
+                            const active = currentSessions.includes(num);
+                            return (
+                              <button
+                                key={num}
+                                type="button"
+                                onClick={() => toggleSessionOption(num)}
+                                className={`px-2 py-1.5 text-xs rounded-md border font-medium transition ${
+                                  active
+                                    ? "bg-primary text-primary-foreground border-primary"
+                                    : "bg-background text-muted-foreground hover:bg-muted"
+                                }`}
+                              >
+                                {num}
+                              </button>
+                            );
+                          })}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Terpilih: {currentSessions.length ? currentSessions.join(", ") : "-"} sesi. Murid hanya bisa memilih dari angka yang dicentang ini.
+                        </p>
+                      </div>
                     </div>
                   )}
                 </div>
