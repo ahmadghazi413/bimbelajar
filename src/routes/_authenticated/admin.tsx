@@ -28,10 +28,10 @@ import { FILE_MAX_BYTES, fileExt, openPrivateFile } from "@/lib/session-content"
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
     meta: [
-      { title: "Panel Admin — Bimbelajar" },
-      { name: "description", content: "Kelola kelas, peserta, voucher dan program referral Bimbelajar." },
-      { property: "og:title", content: "Panel Admin — Bimbelajar" },
-      { property: "og:description", content: "Kelola kelas, peserta, voucher dan program referral Bimbelajar." },
+      { title: "Panel Admin — Padat Ilmu" },
+      { name: "description", content: "Kelola kelas, peserta, voucher dan program referral Padat Ilmu." },
+      { property: "og:title", content: "Panel Admin — Padat Ilmu" },
+      { property: "og:description", content: "Kelola kelas, peserta, voucher dan program referral Padat Ilmu." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -381,6 +381,7 @@ type ClassForm = Partial<Tables<"classes">> & {
   package_type?: string;
   package_weeks?: number;
   package_sessions?: number;
+  available_months?: number[];
 };
 function KelolaKelas() {
   const { data } = useClasses();
@@ -388,6 +389,7 @@ function KelolaKelas() {
   const teachers = parseTeachers(settings?.["teacher_list"]);
   const qc = useQueryClient();
   const [edit, setEdit] = useState<ClassForm | null>(null);
+  const [genderFilter, setGenderFilter] = useState<"all" | "ikhwan" | "akhwat">("all");
 
   async function save() {
     if (!edit) return;
@@ -423,6 +425,7 @@ function KelolaKelas() {
       is_active: rest.is_active ?? true,
       allowed_packages: pkgs,
       available_sessions: (rest as any).available_sessions ?? [4, 8],
+      available_months: (rest as any).available_months?.length ? (rest as any).available_months : [1, 2, 3, 6, 12],
       price_per_session: Number((rest as any).price_per_session ?? 0),
       package_type: sessionOnly ? "session" : "monthly",
       package_weeks: Number(rest.package_weeks || 4),
@@ -465,7 +468,19 @@ function KelolaKelas() {
 
   return (
     <div className="mt-4 space-y-3">
-      <Button
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="space-y-1">
+          <Label>Filter target kelas</Label>
+          <Select value={genderFilter} onValueChange={(v) => setGenderFilter(v as "all" | "ikhwan" | "akhwat")}>
+            <SelectTrigger className="w-full sm:w-56"><SelectValue placeholder="Semua target" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Semua target</SelectItem>
+              <SelectItem value="ikhwan">Ikhwan</SelectItem>
+              <SelectItem value="akhwat">Akhwat</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Button
         onClick={() =>
           setEdit({
             is_active: true,
@@ -477,18 +492,21 @@ function KelolaKelas() {
             package_type: "monthly",
             package_weeks: 4,
             package_sessions: 4,
+            available_months: [1, 2, 3, 6, 12],
+            available_sessions: [4, 8],
             schedule: "Setiap Jumat Pukul 19:30 - 21:00 WIB",
           })
         }
       >
         + Tambah kelas
-      </Button>
+        </Button>
+      </div>
 
-      {data?.map((c) => {
+      {(data ?? []).filter((c) => genderFilter === "all" || (c as any).target_gender === genderFilter).map((c) => {
         const pk: string[] = (c as any).allowed_packages ?? ["monthly", "session"];
         const av: number[] = (c as any).available_sessions ?? [4, 8];
         const descPkg = [
-          pk.includes("monthly") ? `Bulanan ${rupiah(c.price)}` : null,
+          pk.includes("monthly") ? `Bulanan ${rupiah(c.price)}/bulan (pilihan: ${(((c as any).available_months?.length ? (c as any).available_months : [1,2,3,6,12]) as number[]).join(", ")} bulan)` : null,
           pk.includes("session") ? `Per sesi ${rupiah((c as any).price_per_session || 0)}/sesi (pilihan: ${av.join(", ")} sesi)` : null,
         ].filter(Boolean).join(" & ");
 
@@ -704,6 +722,16 @@ function KelolaKelas() {
               const isSession = currentAllowed.includes("session");
 
               const currentSessions: number[] = (edit as any)?.available_sessions ?? [4, 8];
+              const currentMonths: number[] = (edit as any)?.available_months?.length ? (edit as any).available_months : [1, 2, 3, 6, 12];
+              const toggleMonthOption = (val: number) => {
+                let next = [...currentMonths];
+                if (next.includes(val)) {
+                  if (next.length === 1) { toast.error("Pilih minimal satu durasi bulanan."); return; }
+                  next = next.filter((x) => x !== val);
+                } else next.push(val);
+                next.sort((a, b) => a - b);
+                setEdit({ ...edit, available_months: next } as any);
+              };
               const toggleSessionOption = (val: number) => {
                 let next = [...currentSessions];
                 if (next.includes(val)) {
@@ -746,7 +774,7 @@ function KelolaKelas() {
                         checked={isMonthly}
                         onChange={() => togglePkg("monthly")}
                       />
-                      <span className="text-sm font-medium">Paket Bulanan (4 Minggu)</span>
+                      <span className="text-sm font-medium">Paket Bulanan</span>
                     </label>
                     {isMonthly && (
                       <div className="ml-6 space-y-1">
@@ -757,6 +785,16 @@ function KelolaKelas() {
                           value={String(edit?.price ?? "")}
                           onChange={(e) => setEdit({ ...edit, price: Number(e.target.value) } as any)}
                         />
+                        <Label className="text-xs mt-3 block">Durasi yang tersedia untuk murid:</Label>
+                        <div className="grid grid-cols-5 gap-1.5 mt-1">
+                          {[1, 2, 3, 6, 12].map((num) => (
+                            <label key={num} className="flex items-center gap-1.5 rounded-md border bg-background px-2 py-2 text-xs cursor-pointer">
+                              <input type="checkbox" className="rounded" checked={currentMonths.includes(num)} onChange={() => toggleMonthOption(num)} />
+                              {num} bln
+                            </label>
+                          ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">Terpilih: {currentMonths.join(", ") || "-"} bulan.</p>
                       </div>
                     )}
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -1303,7 +1341,7 @@ function Peserta() {
                   {x.sender_name ? ` · a.n. ${x.sender_name}` : ""}
                 </p>
                 <p className="text-xs font-semibold text-primary">
-                  Paket: {extraEnr.package_type === "session" ? `Per Sesi (${extraEnr.sessions_total || 0} Sesi)` : `Bulanan (${(extraEnr.package_weeks || 4) >= 4 ? "1 bulan" : `${extraEnr.package_weeks} minggu`})`}
+                  Paket: {extraEnr.package_type === "session" ? `Per Sesi (${extraEnr.sessions_total || 0} Sesi)` : `Bulanan (${(extraEnr.package_weeks || 4) / 4} bulan)`}
                 </p>
               </div>
               <StatusBadge status={x.status} />
@@ -1579,7 +1617,7 @@ function KelolaVoucher() {
 }
 
 const SETTING_FIELDS = [
-  { key: "site_name", label: "Nama Website / Brand (mis. PadatIlmu)" },
+  { key: "site_name", label: "Nama Website / Brand (mis. Padat Ilmu)" },
   { key: "admin_whatsapp", label: "Nomor WhatsApp admin (mis. 62881022392900)" },
   { key: "bank_name", label: "Nama bank (mis. BCA)" },
   { key: "bank_number", label: "Nomor rekening" },
@@ -1703,7 +1741,7 @@ function Pengaturan() {
       return;
     }
     setBusy(true);
-    const path = `apk/PadatIlmu-${Date.now()}.apk`;
+    const path = `apk/Padat Ilmu-${Date.now()}.apk`;
     const up = await supabase.storage.from("app-files").upload(path, file, {
       upsert: true,
       contentType: "application/vnd.android.package-archive",
@@ -1745,7 +1783,7 @@ function Pengaturan() {
           <Label>{f.label}</Label>
           <Input
             value={vals[f.key] ?? ""}
-            placeholder={f.key === "site_name" ? "PadatIlmu" : ""}
+            placeholder={f.key === "site_name" ? "Padat Ilmu" : ""}
             onChange={(e) => setVals({ ...vals, [f.key]: e.target.value })}
           />
         </div>
@@ -1818,7 +1856,7 @@ function Pengaturan() {
           </div>
         ) : (
           <p className="mt-1 text-center text-xs text-muted-foreground">
-            Belum ada logo khusus (menggunakan ikon bawaan & nama "{vals["site_name"] || "PadatIlmu"}").
+            Belum ada logo khusus (menggunakan ikon bawaan & nama "{vals["site_name"] || "Padat Ilmu"}").
           </p>
         )}
       </div>
@@ -1850,7 +1888,7 @@ function Pengaturan() {
       <div className="rounded-2xl border border-dashed p-4">
         <Label htmlFor="apk-input" className="flex cursor-pointer flex-col items-center gap-2 py-2 text-center">
           <span className="font-semibold">Unggah File Aplikasi Android (.APK)</span>
-          <span className="text-xs text-muted-foreground">Khusus file format .apk aplikasi PadatIlmu</span>
+          <span className="text-xs text-muted-foreground">Khusus file format .apk aplikasi Padat Ilmu</span>
         </Label>
         <input
           id="apk-input"
@@ -1863,7 +1901,7 @@ function Pengaturan() {
         {vals["apk_url"] ? (
           <div className="mt-3 flex flex-col items-center gap-2 bg-secondary/50 p-3 rounded-xl border">
             <p className="text-xs font-medium text-foreground">
-              File aktif: <span className="text-primary font-semibold">{vals["apk_name"] || "PadatIlmu.apk"}</span>
+              File aktif: <span className="text-primary font-semibold">{vals["apk_name"] || "Padat Ilmu.apk"}</span>
             </p>
             <div className="flex gap-2">
               <Button asChild size="sm" variant="outline" className="text-xs h-7">
