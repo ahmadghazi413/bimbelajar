@@ -1,4 +1,8 @@
 # Referral
+## Pemeriksaan keamanan
+- [ ] Tinjau temuan keamanan dan buktikan celah akun, pembayaran, serta akses data.
+- [ ] Perbaiki celah yang terkonfirmasi dan uji perlindungannya.
+- [ ] Periksa ulang hasil keamanan dan laporkan batas pengujian.
 ## Akun email dan password
 - [x] Hapus masuk Google; daftar dengan nama lengkap, email, password, dan nomor WhatsApp.
 - [x] Password baru 8–64 karakter dengan huruf dan angka.
