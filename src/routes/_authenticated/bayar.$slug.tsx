@@ -70,6 +70,7 @@ function Bayar() {
   const [paymentMethod, setPaymentMethod] = useState<"ipaymu" | "manual">("ipaymu");
   const [packageType, setPackageType] = useState<"monthly" | "session">("monthly");
   const [selectedSessions, setSelectedSessions] = useState<number>(8);
+  const [selectedMonths, setSelectedMonths] = useState<number>(1);
 
   const [sender, setSender] = useState("");
   const [busy, setBusy] = useState(false);
@@ -94,7 +95,11 @@ function Bayar() {
   });
 
   if (!c) return <Page title="Memuat...">{null}</Page>;
-  const cx = c as typeof c & { allowed_packages?: string[]; available_sessions?: number[] };
+  const cx = c as typeof c & {
+  allowed_packages?: string[];
+  available_sessions?: number[];
+  available_months?: number[];
+};
   const allowed = cx.allowed_packages?.length ? cx.allowed_packages : ["monthly"];
   const bought = progress.data?.bought ?? 0;
   const remaining = Math.max((progress.data?.total ?? 0) - bought, 0);
@@ -103,6 +108,15 @@ function Bayar() {
   ].sort((a, b) => a - b);
   const effType: "monthly" | "session" = allowed.includes(packageType) ? packageType : (allowed[0] as any);
   const effSessions = sessionOptions.includes(selectedSessions) ? selectedSessions : (sessionOptions[0] ?? 0);
+  const monthOptions = (
+  cx.available_months?.length
+    ? cx.available_months
+    : [1, 2, 3, 6, 12]
+).filter((m) => [1, 2, 3, 6, 12].includes(m));
+
+const effMonths = monthOptions.includes(selectedMonths)
+  ? selectedMonths
+  : (monthOptions[0] ?? 1);
 
   // Metode pembayaran yang diizinkan admin: both | ipaymu | manual
   const payMode = settings?.["payment_mode"] === "ipaymu" || settings?.["payment_mode"] === "manual"
@@ -129,7 +143,10 @@ function Bayar() {
       ? classExtra.price_per_session
       : Math.round(c.price / 8);
 
-  const basePrice = effType === "monthly" ? c.price : sessionPrice * effSessions;
+  const basePrice =
+  effType === "monthly"
+    ? c.price * effMonths
+    : sessionPrice * effSessions;
 
   const quote = useQuery({
     queryKey: ["discount-quote", c?.id, applied?.code, useReward, userId, basePrice],
@@ -369,6 +386,49 @@ function Bayar() {
           </div>
 
           )}
+          {/* Pilihan Durasi Paket Bulanan */}
+{effType === "monthly" && (
+  <div className="space-y-3 rounded-2xl bg-secondary/40 p-4">
+    <Label className="text-sm font-semibold">
+      Pilih Durasi Berlangganan
+    </Label>
+
+    {monthOptions.length > 0 ? (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {monthOptions.map((month) => (
+          <button
+            key={month}
+            type="button"
+            onClick={() => {
+              setSelectedMonths(month);
+              setApplied(null);
+            }}
+            className={`rounded-xl border p-3 text-center transition ${
+              effMonths === month
+                ? "border-primary bg-primary/10 text-primary font-semibold"
+                : "border-border bg-background hover:bg-secondary"
+            }`}
+          >
+            <span className="block text-lg font-bold">
+              {month} Bulan
+            </span>
+            <span className="text-xs">
+              {rupiah(c.price * month)}
+            </span>
+          </button>
+        ))}
+      </div>
+    ) : (
+      <p className="text-sm text-muted-foreground">
+        Belum ada durasi bulanan yang diaktifkan admin.
+      </p>
+    )}
+
+    <p className="text-xs text-muted-foreground">
+      Harga per bulan: {rupiah(c.price)}
+    </p>
+  </div>
+)}
           {/* Jika Paket Sesi Dipilih: murid memilih dari jumlah sesi yang dikeluarkan admin */}
           {effType === "session" && (
             <div className="space-y-2 rounded-2xl bg-secondary/40 p-3">
@@ -404,7 +464,9 @@ function Bayar() {
             <div>
               <p className="text-xs text-muted-foreground">Paket yang dipilih</p>
               <p className="font-semibold text-sm">
-                {effType === "monthly" ? "Paket Bulanan (Akses 30 Hari)" : `Paket ${effSessions} Sesi Pertemuan`}
+                {effType === "monthly"
+  ? `Paket Bulanan (${effMonths} Bulan)`
+  : `Paket ${effSessions} Sesi Pertemuan`}
               </p>
             </div>
             <p className="font-display text-lg font-bold text-primary">{rupiah(basePrice)}</p>
