@@ -101,9 +101,8 @@ function Bayar() {
   const allowed = cx.allowed_packages?.length ? cx.allowed_packages : ["monthly"];
   const bought = progress.data?.bought ?? 0;
   const remaining = Math.max((progress.data?.total ?? 0) - bought, 0);
-  const sessionOptions = [
-    ...new Set([...(cx.available_sessions ?? []), ...(bought > 0 && remaining > 0 ? [remaining] : [])]),
-  ].sort((a, b) => a - b);
+  // Pilihan cepat hanya untuk top-up sisa sesi; selebihnya murid bebas memilih 1–30.
+  const sessionOptions = bought > 0 && remaining > 0 ? [remaining] : [];
   const effType: "monthly" | "session" = allowed.includes(packageType) ? packageType : (allowed[0] as any);
   const effSessions =
     Number.isInteger(selectedSessions) &&
