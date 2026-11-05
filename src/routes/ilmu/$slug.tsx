@@ -2,6 +2,13 @@ import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { subjectClassesQuery } from "@/lib/queries";
 import { ClassCard } from "@/components/ClassCard";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 
 export const Route = createFileRoute("/ilmu/$slug")({
   loader: async ({ context, params }) => {
@@ -43,14 +50,3 @@ function IlmuPage() {
       )}
 
       <h2 className="mt-8 text-xl font-bold text-foreground">Pilih Kelas</h2>
-      <div className="mt-4 grid gap-5">
-        {classes.map((c) => (
-          <ClassCard key={c.id} c={c} />
-        ))}
-        {classes.length === 0 && (
-          <p className="text-muted-foreground">Belum ada kelas yang tersedia untuk ilmu ini.</p>
-        )}
-      </div>
-    </div>
-  );
-}
