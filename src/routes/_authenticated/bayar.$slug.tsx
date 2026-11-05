@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Landmark, MessageCircle, QrCode, Upload, Zap, CreditCard } from "lucide-react";
+import { Landmark, MessageCircle, Minus, Plus, QrCode, Upload, Zap, CreditCard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { classDetailQuery, settingsQuery } from "@/lib/queries";
 import { packageUnit, rupiah } from "@/lib/format";
@@ -37,6 +37,9 @@ async function qrisUrl(path: string) {
   const { data } = await supabase.storage.from("payment-proofs").createSignedUrl(path, 3600);
   return data?.signedUrl ?? "";
 }
+
+const MIN_SESSIONS = 1;
+const MAX_SESSIONS = 30;
 
 function Bayar() {
   const { slug } = Route.useParams();
@@ -102,7 +105,22 @@ function Bayar() {
     ...new Set([...(cx.available_sessions ?? []), ...(bought > 0 && remaining > 0 ? [remaining] : [])]),
   ].sort((a, b) => a - b);
   const effType: "monthly" | "session" = allowed.includes(packageType) ? packageType : (allowed[0] as any);
-  const effSessions = sessionOptions.includes(selectedSessions) ? selectedSessions : (sessionOptions[0] ?? 0);
+  const effSessions =
+    Number.isInteger(selectedSessions) &&
+    ((selectedSessions >= MIN_SESSIONS && selectedSessions <= MAX_SESSIONS) || sessionOptions.includes(selectedSessions))
+      ? selectedSessions
+      : MIN_SESSIONS;
+  const stepSessions = (delta: number) =>
+    setSelectedSessions(Math.min(MAX_SESSIONS, Math.max(MIN_SESSIONS, effSessions + delta)));
+
+  // Metode pembayaran yang diizinkan admin: both | ipaymu | manual
+  const payMode = settings?.["payment_mode"] === "ipaymu" || settings?.["payment_mode"] === "manual"
+    ? (settings["payment_mode"] as "ipaymu" | "manual")
+    : "both";
+  const canIpaymu = payMode !== "manual";
+  const canManual = payMode !== "ipaymu";
+  const effMethod: "ipaymu" | "manual" =
+    paymentMethod === "ipaymu" && canIpaymu ? "ipaymu" : paymentMethod === "manual" && canManual ? "manual" : canIpaymu ? "ipaymu" : "manual";
   const e = enr.data;
   const endDate = e?.status === "paid" ? packageEnd(e as any) : null;
   const sessionTopUp = e?.status === "paid" && (e as any).package_type === "session" && bought > 0 && remaining > 0;
@@ -360,28 +378,62 @@ function Bayar() {
           </div>
 
           )}
-          {/* Jika Paket Sesi Dipilih: Pilihan Jumlah Sesi */}
+          {/* Jika Paket Sesi Dipilih: pilih bebas 1-30 sesi */}
           {effType === "session" && (
-            <div className="space-y-2 rounded-2xl bg-secondary/40 p-3">
-              <Label className="text-xs font-semibold">Pilih Jumlah Pertemuan / Sesi:</Label>
-              <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
-                {sessionOptions.map((num) => (
-                  <button
-                    key={num}
-                    type="button"
-                    onClick={() => setSelectedSessions(num)}
-                    className={`rounded-xl py-2 text-xs font-bold transition border ${
-                      effSessions === num
-                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                        : "bg-background border-border hover:bg-secondary"
-                    }`}
-                  >
-                    {num} Sesi
-                  </button>
-                ))}
+            <div className="space-y-3 rounded-2xl bg-secondary/40 p-3">
+              <Label className="text-xs font-semibold">Pilih Jumlah Pertemuan / Sesi (1–{MAX_SESSIONS}):</Label>
+              <div className="flex items-center justify-center gap-3">
+                <Button type="button" variant="outline" size="icon" className="h-10 w-10 rounded-full"
+                  disabled={effSessions <= MIN_SESSIONS} onClick={() => stepSessions(-1)}>
+                  <Minus className="h-4 w-4" />
+                </Button>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  min={MIN_SESSIONS}
+                  max={MAX_SESSIONS}
+                  value={effSessions}
+                  onChange={(ev) => {
+                    const n = Math.round(Number(ev.target.value));
+                    if (Number.isFinite(n)) setSelectedSessions(Math.min(MAX_SESSIONS, Math.max(MIN_SESSIONS, n)));
+                  }}
+                  className="h-10 w-20 text-center text-lg font-bold"
+                />
+                <Button type="button" variant="outline" size="icon" className="h-10 w-10 rounded-full"
+                  disabled={effSessions >= MAX_SESSIONS} onClick={() => stepSessions(1)}>
+                  <Plus className="h-4 w-4" />
+                </Button>
               </div>
+              <input
+                type="range"
+                min={MIN_SESSIONS}
+                max={MAX_SESSIONS}
+                step={1}
+                value={Math.min(effSessions, MAX_SESSIONS)}
+                onChange={(ev) => setSelectedSessions(Number(ev.target.value))}
+                className="w-full accent-[hsl(var(--primary))]"
+                aria-label="Jumlah sesi"
+              />
+              {sessionOptions.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {sessionOptions.map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setSelectedSessions(num)}
+                      className={`rounded-xl border px-3 py-1.5 text-xs font-bold transition ${
+                        effSessions === num
+                          ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                          : "bg-background border-border hover:bg-secondary"
+                      }`}
+                    >
+                      {num} Sesi
+                    </button>
+                  ))}
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
-                Paket {effSessions} Sesi: <b>{rupiah(basePrice)}</b>
+                {effSessions} sesi × {rupiah(sessionPrice)} = <b>{rupiah(basePrice)}</b>
               </p>
             </div>
           )}
@@ -449,7 +501,8 @@ function Bayar() {
             <span className="font-display text-xl font-extrabold text-primary">{rupiah(finalPrice)}</span>
           </div>
 
-          {/* PILIHAN METODE PEMBAYARAN */}
+          {/* PILIHAN METODE PEMBAYARAN (hanya tampil jika admin mengaktifkan keduanya) */}
+          {canIpaymu && canManual && (
           <div className="space-y-3 pt-2">
             <Label className="font-semibold text-sm">Pilih Cara Pembayaran:</Label>
             <div className="grid grid-cols-2 gap-2">
@@ -457,7 +510,7 @@ function Bayar() {
                 type="button"
                 onClick={() => setPaymentMethod("ipaymu")}
                 className={`flex flex-col items-start rounded-2xl border p-3.5 transition ${
-                  paymentMethod === "ipaymu"
+                  effMethod === "ipaymu"
                     ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20"
                     : "border-border hover:bg-secondary"
                 }`}
@@ -475,7 +528,7 @@ function Bayar() {
                 type="button"
                 onClick={() => setPaymentMethod("manual")}
                 className={`flex flex-col items-start rounded-2xl border p-3.5 transition ${
-                  paymentMethod === "manual"
+                  effMethod === "manual"
                     ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20"
                     : "border-border hover:bg-secondary"
                 }`}
@@ -490,9 +543,10 @@ function Bayar() {
               </button>
             </div>
           </div>
+          )}
 
           {/* JIKA MEMILIH IPAYMU (OTOMATIS) */}
-          {paymentMethod === "ipaymu" ? (
+          {effMethod === "ipaymu" ? (
             <div className="space-y-3 rounded-2xl bg-secondary/30 p-4 border">
               <div className="flex items-start gap-3">
                 <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
