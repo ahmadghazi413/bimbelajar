@@ -670,6 +670,8 @@ export type Database = {
           id: string
           is_active: boolean
           max_uses: number | null
+          package_target: string
+          target_counts: number[]
           used_count: number
         }
         Insert: {
@@ -681,6 +683,8 @@ export type Database = {
           id?: string
           is_active?: boolean
           max_uses?: number | null
+          package_target?: string
+          target_counts?: number[]
           used_count?: number
         }
         Update: {
@@ -692,6 +696,8 @@ export type Database = {
           id?: string
           is_active?: boolean
           max_uses?: number | null
+          package_target?: string
+          target_counts?: number[]
           used_count?: number
         }
         Relationships: []
@@ -806,6 +812,10 @@ export type Database = {
           final_amount: number
           voucher_code: string
         }[]
+      }
+      voucher_scope_ok: {
+        Args: { _code: string; _count: number; _package: string }
+        Returns: boolean
       }
     }
     Enums: {
