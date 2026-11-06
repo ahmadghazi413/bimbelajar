@@ -1541,6 +1541,8 @@ function KelolaVoucher() {
       max_uses: edit.max_uses ? Number(edit.max_uses) : null,
       is_active: edit.is_active ?? true,
       expires_at: edit.expires_at || null,
+      package_target: edit.package_target ?? "all",
+      target_counts: (edit.package_target ?? "all") === "all" ? [] : (edit.target_counts ?? []),
     };
     const res = edit.id
       ? await supabase.from("vouchers").update(payload).eq("id", edit.id)
@@ -1571,6 +1573,12 @@ function KelolaVoucher() {
               {" · "}terpakai {v.used_count}
               {v.max_uses ? `/${v.max_uses}` : ""}
               {v.expires_at ? ` · s.d. ${tanggal(v.expires_at)}` : ""}
+              {" · "}
+              {v.package_target === "monthly"
+                ? `Khusus bulanan${v.target_counts?.length ? ` (${v.target_counts.join(", ")} bln)` : ""}`
+                : v.package_target === "session"
+                  ? `Khusus paket sesi${v.target_counts?.length ? ` (${v.target_counts.join(", ")} sesi)` : ""}`
+                  : "Semua paket"}
             </p>
           </div>
           <Button
