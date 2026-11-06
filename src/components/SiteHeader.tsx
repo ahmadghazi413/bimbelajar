@@ -40,13 +40,13 @@ export function SiteHeader() {
   const logo = logoUrl ? (
     <img src={logoUrl} alt="" className="h-9 w-auto max-w-[130px] object-contain" />
   ) : (
-    <span className="grid h-9 w-9 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+    <span className="grid h-10 w-10 place-items-center rounded-xl bg-primary text-primary-foreground ring-[1.5px] ring-inset ring-gold">
       <BookOpen className="h-5 w-5" aria-hidden="true" />
     </span>
   );
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/80 bg-background/90 backdrop-blur-xl supports-[backdrop-filter]:bg-background/75">
+    <header className="sticky top-0 z-40 border-b border-border/80 bg-card/90 backdrop-blur-xl supports-[backdrop-filter]:bg-background/75">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
         <div className="flex min-w-0 items-center gap-2">
           <Sheet open={open} onOpenChange={setOpen}>
@@ -95,14 +95,14 @@ export function SiteHeader() {
 
           <Link to="/" aria-label={`${siteName} — Beranda`} className="flex min-w-0 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             {logo}
-            <span className="truncate font-display text-lg font-bold tracking-tight text-primary">{siteName}</span>
+            <span className="truncate font-display text-lg font-extrabold tracking-tight text-primary">{siteName}</span>
           </Link>
         </div>
 
         <nav className="hidden items-center gap-1 lg:flex" aria-label="Navigasi utama">
-          <Link to="/kelas" className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-primary">Pilih Kelas</Link>
-          <Link to="/faq" className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-primary">FAQ</Link>
-          <Link to="/kontak" className="rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-primary">Kontak</Link>
+          <Link to="/kelas" className="rounded-xl px-3.5 py-2.5 text-[15px] font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-primary">Pilih Kelas</Link>
+          <Link to="/faq" className="rounded-xl px-3.5 py-2.5 text-[15px] font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-primary">FAQ</Link>
+          <Link to="/kontak" className="rounded-xl px-3.5 py-2.5 text-[15px] font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-primary">Kontak</Link>
         </nav>
 
         <div className="flex shrink-0 items-center gap-2">

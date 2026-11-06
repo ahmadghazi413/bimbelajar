@@ -166,6 +166,14 @@ const effMonths = monthOptions.includes(selectedMonths)
     setBusy(true);
     try {
       const row = await discountQuote(c.id, voucher, useReward);
+      if (row.kind === "voucher") {
+        const { data: ok } = await (supabase as any).rpc("voucher_scope_ok", {
+          _code: row.code,
+          _package: effType,
+          _count: effType === "session" ? effSessions : effMonths,
+        });
+        if (ok === false) throw new Error("Voucher ini tidak berlaku untuk paket yang dipilih.");
+      }
       setApplied({ code: row.code, kind: row.kind });
       toast.success(`Kode diterapkan. Diskon ${rupiah(row.discount)}.`);
     } catch (error) {
