@@ -109,6 +109,7 @@ export type Database = {
         Row: {
           advantages: string
           allowed_packages: string[]
+          available_months: number[]
           available_sessions: number[]
           created_at: string
           default_session_count: number
@@ -132,11 +133,13 @@ export type Database = {
           sort_order: number
           subject_id: string | null
           tagline: string
+          target_gender: string
           teacher_id: string | null
         }
         Insert: {
           advantages?: string
           allowed_packages?: string[]
+          available_months?: number[]
           available_sessions?: number[]
           created_at?: string
           default_session_count?: number
@@ -160,11 +163,13 @@ export type Database = {
           sort_order?: number
           subject_id?: string | null
           tagline?: string
+          target_gender?: string
           teacher_id?: string | null
         }
         Update: {
           advantages?: string
           allowed_packages?: string[]
+          available_months?: number[]
           available_sessions?: number[]
           created_at?: string
           default_session_count?: number
@@ -188,6 +193,7 @@ export type Database = {
           sort_order?: number
           subject_id?: string | null
           tagline?: string
+          target_gender?: string
           teacher_id?: string | null
         }
         Relationships: [
@@ -707,6 +713,13 @@ export type Database = {
         Args: { _start: string; _type: string; _weeks: number }
         Returns: string
       }
+      get_class_enrollment_counts: {
+        Args: never
+        Returns: {
+          class_id: string
+          enrolled_count: number
+        }[]
+      }
       has_paid: {
         Args: { _class_id: string; _user_id: string }
         Returns: boolean
@@ -757,6 +770,23 @@ export type Database = {
           _base: number
           _class_id: string
           _code: string
+          _use_reward: boolean
+        }
+        Returns: {
+          code: string
+          discount: number
+          final_amount: number
+          kind: string
+          referrer_id: string
+          reward_amount: number
+          reward_used: number
+        }[]
+      }
+      validate_discount_months: {
+        Args: {
+          _class_id: string
+          _code: string
+          _months: number
           _use_reward: boolean
         }
         Returns: {
