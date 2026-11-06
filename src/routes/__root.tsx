@@ -155,9 +155,7 @@ function RootComponent() {
         <main className="min-h-[calc(100vh-4rem)]">
           <Outlet />
         </main>
-        <footer className="border-t py-8 text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} Bimbelajar · Belajar ngaji tanpa malu
-        </footer>
+        <SiteFooter />
         <Toaster position="top-center" richColors />
       </AuthProvider>
     </QueryClientProvider>
