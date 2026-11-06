@@ -1639,6 +1639,47 @@ function KelolaVoucher() {
                 onChange={(e) => setEdit({ ...edit, expires_at: e.target.value })}
               />
             </div>
+            <div className="space-y-1">
+              <Label>Berlaku untuk paket</Label>
+              <select
+                value={edit?.package_target ?? "all"}
+                onChange={(e) => setEdit({ ...edit, package_target: e.target.value, target_counts: [] })}
+                className="h-11 w-full rounded-xl border bg-card px-3"
+              >
+                <option value="all">Semua paket (bulanan &amp; sesi)</option>
+                <option value="monthly">Khusus paket bulanan</option>
+                <option value="session">Khusus paket per sesi</option>
+              </select>
+            </div>
+            {(edit?.package_target === "monthly" || edit?.package_target === "session") && (
+              <div className="space-y-1">
+                <Label>
+                  {edit.package_target === "monthly" ? "Bulan tertentu" : "Jumlah sesi tertentu"} (kosongkan = semua)
+                </Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {(edit.package_target === "monthly" ? [1, 2, 3, 6, 12] : Array.from({ length: 30 }, (_, i) => i + 1)).map((n) => {
+                    const on = edit.target_counts?.includes(n) ?? false;
+                    return (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() =>
+                          setEdit({
+                            ...edit,
+                            target_counts: on
+                              ? (edit.target_counts ?? []).filter((x) => x !== n)
+                              : [...(edit.target_counts ?? []), n].sort((a, b) => a - b),
+                          })
+                        }
+                        className={`h-9 min-w-9 rounded-lg border px-2 text-sm font-semibold ${on ? "border-primary bg-primary text-primary-foreground" : "bg-card"}`}
+                      >
+                        {n}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <Switch checked={edit?.is_active ?? true} onCheckedChange={(v) => setEdit({ ...edit, is_active: v })} />
               <Label>Aktif</Label>
