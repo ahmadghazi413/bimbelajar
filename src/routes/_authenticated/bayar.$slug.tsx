@@ -96,10 +96,14 @@ function Bayar() {
 
   if (!c) return <Page title="Memuat...">{null}</Page>;
   const cx = c as typeof c & {
-  allowed_packages?: string[];
-  available_sessions?: number[];
-  available_months?: number[];
-};
+    allowed_packages?: string[];
+    available_sessions?: number[];
+    available_months?: number[];
+    price_normal?: number | null;
+    price_promo?: number | null;
+    price_per_session_normal?: number | null;
+    price_per_session_promo?: number | null;
+  };
   const allowed = cx.allowed_packages?.length ? cx.allowed_packages : ["monthly"];
   const bought = progress.data?.bought ?? 0;
   const remaining = Math.max((progress.data?.total ?? 0) - bought, 0);
@@ -109,16 +113,15 @@ function Bayar() {
   const effType: "monthly" | "session" = allowed.includes(packageType) ? packageType : (allowed[0] as any);
   const effSessions = sessionOptions.includes(selectedSessions) ? selectedSessions : (sessionOptions[0] ?? 0);
   const monthOptions = (
-  cx.available_months?.length
-    ? cx.available_months
-    : [1, 2, 3, 6, 12]
-).filter((m) => [1, 2, 3, 6, 12].includes(m));
+    cx.available_months?.length
+      ? cx.available_months
+      : [1, 2, 3, 6, 12]
+  ).filter((m) => [1, 2, 3, 6, 12].includes(m));
 
-const effMonths = monthOptions.includes(selectedMonths)
-  ? selectedMonths
-  : (monthOptions[0] ?? 1);
+  const effMonths = monthOptions.includes(selectedMonths)
+    ? selectedMonths
+    : (monthOptions[0] ?? 1);
 
-  // Metode pembayaran yang diizinkan admin: both | ipaymu | manual
   const payMode = settings?.["payment_mode"] === "ipaymu" || settings?.["payment_mode"] === "manual"
     ? (settings["payment_mode"] as "ipaymu" | "manual")
     : "both";
@@ -137,16 +140,18 @@ const effMonths = monthOptions.includes(selectedMonths)
     holder: settings?.["bank_holder"] || "Yayasan Bimbelajar",
   };
 
-  const classExtra = c as typeof c & { price_per_session?: number | null };
-  const sessionPrice =
-    classExtra.price_per_session && classExtra.price_per_session > 0
+  const classExtra = c as typeof c & { price_per_session?: number | null; price_per_session_promo?: number | null; price_per_session_normal?: number | null };
+  const monthlyPrice = Number((c as any).price_promo ?? 0) > 0 ? Number((c as any).price_promo ?? 0) : Number(c.price ?? 0);
+  const sessionPrice = Number((classExtra as any).price_per_session_promo ?? 0) > 0
+    ? Number((classExtra as any).price_per_session_promo ?? 0)
+    : (classExtra.price_per_session && classExtra.price_per_session > 0
       ? classExtra.price_per_session
-      : Math.round(c.price / 8);
+      : Math.round(c.price / 8));
 
   const basePrice =
-  effType === "monthly"
-    ? c.price * effMonths
-    : sessionPrice * effSessions;
+    effType === "monthly"
+      ? monthlyPrice * effMonths
+      : sessionPrice * effSessions;
 
   const quote = useQuery({
     queryKey: ["discount-quote", c?.id, applied?.code, useReward, userId, basePrice],
@@ -352,7 +357,6 @@ const effMonths = monthOptions.includes(selectedMonths)
             <p className="text-destructive">Pembayaran sebelumnya ditolak. Silakan daftar ulang.</p>
           )}
 
-          {/* Pilihan Paket: Bulanan vs Per Sesi */}
           {sessionTopUp && (
             <div className="rounded-2xl bg-primary/10 p-4 text-sm">
               <p className="font-semibold text-primary">Anda sudah membuka {bought} sesi. Tersisa {remaining} sesi lagi di kelas ini.</p>
@@ -361,83 +365,70 @@ const effMonths = monthOptions.includes(selectedMonths)
             </div>
           )}
           {allowed.length > 1 && (
-          <div className="space-y-2">
-            <Label className="font-semibold">Pilih Paket Belajar</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setPackageType("monthly")}
-                className={`rounded-2xl border p-3 text-left transition ${
-                  effType === "monthly"
-                    ? "border-primary bg-primary/10 text-primary font-semibold"
-                    : "border-border hover:bg-secondary"
-                }`}
-              >
-                <div className="text-xs text-muted-foreground">Langganan</div>
-                <div className="text-sm font-bold">Bulanan (1 Bulan)</div>
-                <div className="text-xs text-primary mt-1">{rupiah(c.price)}</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setPackageType("session")}
-                className={`rounded-2xl border p-3 text-left transition ${
-                  effType === "session"
-                    ? "border-primary bg-primary/10 text-primary font-semibold"
-                    : "border-border hover:bg-secondary"
-                }`}
-              >
-                <div className="text-xs text-muted-foreground">Fleksibel</div>
-                <div className="text-sm font-bold">Bayar Paket Sesi</div>
-                <div className="text-xs text-primary mt-1">Pilih jumlah sesi</div>
-              </button>
+            <div className="space-y-2">
+              <Label className="font-semibold">Pilih Paket Belajar</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPackageType("monthly")}
+                  className={`rounded-2xl border p-3 text-left transition ${
+                    effType === "monthly"
+                      ? "border-primary bg-primary/10 text-primary font-semibold"
+                      : "border-border hover:bg-secondary"
+                  }`}
+                >
+                  <div className="text-xs text-muted-foreground">Langganan</div>
+                  <div className="text-sm font-bold">Bulanan (1 Bulan)</div>
+                  <div className="text-xs text-primary mt-1">{rupiah(monthlyPrice)}</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPackageType("session")}
+                  className={`rounded-2xl border p-3 text-left transition ${
+                    effType === "session"
+                      ? "border-primary bg-primary/10 text-primary font-semibold"
+                      : "border-border hover:bg-secondary"
+                  }`}
+                >
+                  <div className="text-xs text-muted-foreground">Fleksibel</div>
+                  <div className="text-sm font-bold">Bayar Paket Sesi</div>
+                  <div className="text-xs text-primary mt-1">Pilih jumlah sesi</div>
+                </button>
+              </div>
             </div>
-          </div>
-
           )}
-          {/* Pilihan Durasi Paket Bulanan */}
-{effType === "monthly" && (
-  <div className="space-y-3 rounded-2xl bg-secondary/40 p-4">
-    <Label className="text-sm font-semibold">
-      Pilih Durasi Berlangganan
-    </Label>
+          {effType === "monthly" && (
+            <div className="space-y-3 rounded-2xl bg-secondary/40 p-4">
+              <Label className="text-sm font-semibold">Pilih Durasi Berlangganan</Label>
 
-    {monthOptions.length > 0 ? (
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {monthOptions.map((month) => (
-          <button
-            key={month}
-            type="button"
-            onClick={() => {
-              setSelectedMonths(month);
-              setApplied(null);
-            }}
-            className={`rounded-xl border p-3 text-center transition ${
-              effMonths === month
-                ? "border-primary bg-primary/10 text-primary font-semibold"
-                : "border-border bg-background hover:bg-secondary"
-            }`}
-          >
-            <span className="block text-lg font-bold">
-              {month} Bulan
-            </span>
-            <span className="text-xs">
-              {rupiah(c.price * month)}
-            </span>
-          </button>
-        ))}
-      </div>
-    ) : (
-      <p className="text-sm text-muted-foreground">
-        Belum ada durasi bulanan yang diaktifkan admin.
-      </p>
-    )}
+              {monthOptions.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {monthOptions.map((month) => (
+                    <button
+                      key={month}
+                      type="button"
+                      onClick={() => {
+                        setSelectedMonths(month);
+                        setApplied(null);
+                      }}
+                      className={`rounded-xl border p-3 text-center transition ${
+                        effMonths === month
+                          ? "border-primary bg-primary/10 text-primary font-semibold"
+                          : "border-border bg-background hover:bg-secondary"
+                      }`}
+                    >
+                      <span className="block text-lg font-bold">{month} Bulan</span>
+                      <span className="text-xs">{rupiah(monthlyPrice * month)}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Belum ada durasi bulanan yang diaktifkan admin.</p>
+              )}
 
-    <p className="text-xs text-muted-foreground">
-      Harga per bulan: {rupiah(c.price)}
-    </p>
-  </div>
-)}
-          {/* Jika Paket Sesi Dipilih: murid memilih dari jumlah sesi yang dikeluarkan admin */}
+              <p className="text-xs text-muted-foreground">Harga per bulan: {rupiah(monthlyPrice)}</p>
+            </div>
+          )}
           {effType === "session" && (
             <div className="space-y-2 rounded-2xl bg-secondary/40 p-3">
               <Label className="text-xs font-semibold">Pilih Jumlah Pertemuan / Sesi:</Label>
@@ -467,20 +458,18 @@ const effMonths = monthOptions.includes(selectedMonths)
             </div>
           )}
 
-          {/* Rincian Paket Terpilih */}
           <div className="flex items-center justify-between rounded-2xl bg-secondary/50 p-4">
             <div>
               <p className="text-xs text-muted-foreground">Paket yang dipilih</p>
               <p className="font-semibold text-sm">
                 {effType === "monthly"
-  ? `Paket Bulanan (${effMonths} Bulan)`
-  : `Paket ${effSessions} Sesi Pertemuan`}
+                  ? `Paket Bulanan (${effMonths} Bulan)`
+                  : `Paket ${effSessions} Sesi Pertemuan`}
               </p>
             </div>
             <p className="font-display text-lg font-bold text-primary">{rupiah(basePrice)}</p>
           </div>
 
-          {/* Kode Promo / Referral */}
           <div className="space-y-2">
             <Label htmlFor="v">Kode teman / voucher (opsional)</Label>
             <div className="flex gap-2">
@@ -511,7 +500,6 @@ const effMonths = monthOptions.includes(selectedMonths)
             )}
           </div>
 
-          {/* Bonus Referral */}
           {(balance.data ?? 0) > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
@@ -526,57 +514,54 @@ const effMonths = monthOptions.includes(selectedMonths)
             </div>
           )}
 
-          {/* Total Akhir */}
           <div className="rounded-2xl border-2 border-primary/20 bg-primary/5 p-4 flex items-center justify-between">
             <span className="font-semibold text-sm">Total yang Harus Dibayar</span>
             <span className="font-display text-xl font-extrabold text-primary">{rupiah(finalPrice)}</span>
           </div>
 
-          {/* PILIHAN METODE PEMBAYARAN (hanya tampil jika admin mengaktifkan keduanya) */}
           {canIpaymu && canManual && (
-          <div className="space-y-3 pt-2">
-            <Label className="font-semibold text-sm">Pilih Cara Pembayaran:</Label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setPaymentMethod("ipaymu")}
-                className={`flex flex-col items-start rounded-2xl border p-3.5 transition ${
-                  effMethod === "ipaymu"
-                    ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20"
-                    : "border-border hover:bg-secondary"
-                }`}
-              >
-                <div className="flex items-center gap-1.5 font-bold text-sm">
-                  <Zap className="h-4 w-4 text-amber-500 fill-amber-500" />
-                  Otomatis (iPaymu)
-                </div>
-                <div className="text-[11px] text-muted-foreground mt-1">
-                  QRIS otomatis, VA Bank (BCA, Mandiri, BRI, BNI). Langsung lunas &amp; aktif!
-                </div>
-              </button>
+            <div className="space-y-3 pt-2">
+              <Label className="font-semibold text-sm">Pilih Cara Pembayaran:</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("ipaymu")}
+                  className={`flex flex-col items-start rounded-2xl border p-3.5 transition ${
+                    effMethod === "ipaymu"
+                      ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20"
+                      : "border-border hover:bg-secondary"
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 font-bold text-sm">
+                    <Zap className="h-4 w-4 text-amber-500 fill-amber-500" />
+                    Otomatis (iPaymu)
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-1">
+                    QRIS otomatis, VA Bank (BCA, Mandiri, BRI, BNI). Langsung lunas &amp; aktif!
+                  </div>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setPaymentMethod("manual")}
-                className={`flex flex-col items-start rounded-2xl border p-3.5 transition ${
-                  effMethod === "manual"
-                    ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20"
-                    : "border-border hover:bg-secondary"
-                }`}
-              >
-                <div className="flex items-center gap-1.5 font-bold text-sm">
-                  <Landmark className="h-4 w-4" />
-                  Transfer Manual
-                </div>
-                <div className="text-[11px] text-muted-foreground mt-1">
-                  Transfer ke rekening admin lalu kirim bukti transfer.
-                </div>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("manual")}
+                  className={`flex flex-col items-start rounded-2xl border p-3.5 transition ${
+                    effMethod === "manual"
+                      ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20"
+                      : "border-border hover:bg-secondary"
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 font-bold text-sm">
+                    <Landmark className="h-4 w-4" />
+                    Transfer Manual
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-1">
+                    Transfer ke rekening admin lalu kirim bukti transfer.
+                  </div>
+                </button>
+              </div>
             </div>
-          </div>
           )}
 
-          {/* JIKA MEMILIH IPAYMU (OTOMATIS) */}
           {effMethod === "ipaymu" ? (
             <div className="space-y-3 rounded-2xl bg-secondary/30 p-4 border">
               <div className="flex items-start gap-3">
@@ -584,7 +569,7 @@ const effMonths = monthOptions.includes(selectedMonths)
                   <CreditCard className="h-4 w-4" />
                 </div>
                 <div className="text-xs text-muted-foreground leading-relaxed">
-                  Setelah menekan tombol di bawah, Anda akan diarahkan ke halaman resmi <strong>iPaymu</strong> untuk memilih metode bayar (Scan QRIS GoPay/ShopeePay/DANA/OVO atau Virtual Account). Begitu dibayar, kelas akan langsung aktif otomatis!
+                  Setelah menekan tombol di bawah, Anda akan diarahkan ke halaman resmi <strong>iPaymu</strong> untuk memilih metode bayar (Scan QRIS GoPay/ShopeePay/DANA/OVO atau Virtual Account Bank).
                 </div>
               </div>
 
@@ -599,7 +584,6 @@ const effMonths = monthOptions.includes(selectedMonths)
               </Button>
             </div>
           ) : (
-            /* JIKA MEMILIH TRANSFER MANUAL */
             <div className="space-y-4 pt-1">
               <TransferInfo amount={finalPrice} qris={qris ?? ""} bank={bank} />
 
@@ -726,3 +710,18 @@ function ProofUpload({
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

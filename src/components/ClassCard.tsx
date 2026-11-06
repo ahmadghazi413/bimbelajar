@@ -1,13 +1,16 @@
+import { GraduationCap, CalendarDays, Users } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import { CalendarDays, GraduationCap, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { packageUnit, rupiah } from "@/lib/format";
-import type { Tables } from "@/integrations/supabase/types";
 import { TeacherIdentity } from "@/components/TeacherIdentity";
 
-export function ClassCard({ c }: { c: Tables<"classes"> }) {
-  const targetGender = (c as Tables<"classes"> & { target_gender?: string | null }).target_gender;
+export function ClassCard({ c }: { c: any }) {
+  const targetGender = c.target_gender;
   const genderLabel = targetGender === "ikhwan" ? "Ikhwan · Laki-laki" : targetGender === "akhwat" ? "Akhwat · Perempuan" : null;
+  const regularPrice = Number(c.price_normal ?? c.price ?? 0);
+  const promoPrice = Number(c.price_promo ?? 0);
+  const finalPrice = promoPrice > 0 ? promoPrice : regularPrice;
+  const hasPromo = promoPrice > 0 && promoPrice < regularPrice;
 
   return (
     <article className="group flex h-full flex-col overflow-hidden rounded-3xl border bg-card shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5">
@@ -49,7 +52,14 @@ export function ClassCard({ c }: { c: Tables<"classes"> }) {
           <p className="text-xs font-medium text-muted-foreground">Investasi belajar</p>
           <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
             {c.price_prefix && <span className="text-sm text-muted-foreground">{c.price_prefix}</span>}
-            <span className="font-display text-2xl font-bold text-foreground sm:text-3xl">{rupiah(c.price)}</span>
+            {hasPromo ? (
+              <>
+                <span className="text-sm text-muted-foreground line-through">{rupiah(regularPrice)}</span>
+                <span className="font-display text-2xl font-bold text-foreground sm:text-3xl">{rupiah(finalPrice)}</span>
+              </>
+            ) : (
+              <span className="font-display text-2xl font-bold text-foreground sm:text-3xl">{rupiah(regularPrice)}</span>
+            )}
             <span className="text-sm text-muted-foreground">/{packageUnit(c)}</span>
           </div>
           <Button asChild className="mt-4 w-full rounded-xl font-semibold transition-transform group-hover:translate-y-0">
@@ -60,3 +70,61 @@ export function ClassCard({ c }: { c: Tables<"classes"> }) {
     </article>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
