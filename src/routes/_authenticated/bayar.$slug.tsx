@@ -17,7 +17,6 @@ import { canConfirmPayment, validateProof } from "@/lib/payment-proofs";
 import { PaymentProof } from "@/components/PaymentProof";
 import { createIpaymuPayment } from "@/lib/ipaymu.functions";
 
-
 export const Route = createFileRoute("/_authenticated/bayar/$slug")({
   head: () => ({
     meta: [
@@ -95,6 +94,7 @@ function Bayar() {
   });
 
   if (!c) return <Page title="Memuat...">{null}</Page>;
+
   const cx = c as typeof c & {
     allowed_packages?: string[];
     available_sessions?: number[];
@@ -113,14 +113,9 @@ function Bayar() {
   const effType: "monthly" | "session" = allowed.includes(packageType) ? packageType : (allowed[0] as any);
   const effSessions = sessionOptions.includes(selectedSessions) ? selectedSessions : (sessionOptions[0] ?? 0);
   const monthOptions = (
-    cx.available_months?.length
-      ? cx.available_months
-      : [1, 2, 3, 6, 12]
+    cx.available_months?.length ? cx.available_months : [1, 2, 3, 6, 12]
   ).filter((m) => [1, 2, 3, 6, 12].includes(m));
-
-  const effMonths = monthOptions.includes(selectedMonths)
-    ? selectedMonths
-    : (monthOptions[0] ?? 1);
+  const effMonths = monthOptions.includes(selectedMonths) ? selectedMonths : (monthOptions[0] ?? 1);
 
   const payMode = settings?.["payment_mode"] === "ipaymu" || settings?.["payment_mode"] === "manual"
     ? (settings["payment_mode"] as "ipaymu" | "manual")
@@ -140,13 +135,14 @@ function Bayar() {
     holder: settings?.["bank_holder"] || "Yayasan Bimbelajar",
   };
 
-  const classExtra = c as typeof c & { price_per_session?: number | null; price_per_session_promo?: number | null; price_per_session_normal?: number | null };
-  const monthlyPrice = Number((c as any).price_promo ?? 0) > 0 ? Number((c as any).price_promo ?? 0) : Number(c.price ?? 0);
-  const sessionPrice = Number((classExtra as any).price_per_session_promo ?? 0) > 0
-    ? Number((classExtra as any).price_per_session_promo ?? 0)
-    : (classExtra.price_per_session && classExtra.price_per_session > 0
-      ? classExtra.price_per_session
-      : Math.round(c.price / 8));
+  const classExtra = c as typeof c & { price_per_session?: number | null };
+  const normalMonthlyPrice = Number((c as any).price_normal ?? c.price ?? 0);
+  const promoMonthlyPrice = Number((c as any).price_promo ?? 0);
+  const monthlyPrice = promoMonthlyPrice > 0 ? promoMonthlyPrice : normalMonthlyPrice;
+
+  const normalSessionPrice = Number((c as any).price_per_session_normal ?? classExtra.price_per_session ?? 0);
+  const promoSessionPrice = Number((c as any).price_per_session_promo ?? 0);
+  const sessionPrice = promoSessionPrice > 0 ? promoSessionPrice : (normalSessionPrice > 0 ? normalSessionPrice : Math.round(c.price / 8));
 
   const basePrice =
     effType === "monthly"
@@ -304,7 +300,7 @@ function Bayar() {
   return (
     <Page
       title={`Daftar ${c.name} — Level ${c.level_number} ${c.level_label}`}
-      subtitle={`${c.price_prefix} ${rupiah(c.price)} / ${packageUnit(c)}`}
+      subtitle={`${c.price_prefix} ${rupiah(monthlyPrice)} / ${packageUnit(c)}`}
     >
       {enr.isPending ? (
         <p>Memuat pendaftaran...</p>
@@ -710,18 +706,3 @@ function ProofUpload({
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
