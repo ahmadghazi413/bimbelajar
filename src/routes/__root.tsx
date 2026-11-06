@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider } from "@/lib/auth";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteHeader } from "@/components/SiteHeader";
+
 import { Toaster } from "@/components/ui/sonner";
 import { isRecoveryUrl } from "@/lib/auth-navigation";
 
