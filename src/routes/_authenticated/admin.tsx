@@ -1833,7 +1833,7 @@ function Pengaturan() {
             { v: "ipaymu", t: "Hanya iPaymu", d: "Otomatis (QRIS / VA)" },
             { v: "manual", t: "Hanya Manual", d: "Transfer + bukti bayar" },
           ] as const).map((o) => {
-            const active = (["ipaymu", "manual"].includes(vals["payment_mode"]) ? vals["payment_mode"] : "both") === o.v;
+            const active = (["ipaymu", "manual"].includes(vals["payment_mode"] ?? "") ? vals["payment_mode"] : "both") === o.v;
             return (
               <button
                 key={o.v}
