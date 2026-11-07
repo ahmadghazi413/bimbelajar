@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { Landmark, MessageCircle, QrCode, Upload, Zap, CreditCard } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { classDetailQuery, settingsQuery } from "@/lib/queries";
-import { packageUnit, rupiah } from "@/lib/format";
+import { rupiah } from "@/lib/format";
+import { getPackagePrice, packageCounts, packageLabel, startingPrice, unitWeeks } from "@/lib/package-prices";
 import { daysLeft, packageEnd } from "@/lib/notifications";
 import { Page, StatusBadge } from "@/components/PageTitle";
 import { Button } from "@/components/ui/button";
@@ -108,13 +109,11 @@ function Bayar() {
   const bought = progress.data?.bought ?? 0;
   const remaining = Math.max((progress.data?.total ?? 0) - bought, 0);
   const sessionOptions = [
-    ...new Set([...(cx.available_sessions ?? []), ...(bought > 0 && remaining > 0 ? [remaining] : [])]),
+    ...new Set([...packageCounts(c, "session"), ...(bought > 0 && remaining > 0 ? [remaining] : [])]),
   ].sort((a, b) => a - b);
   const effType: "monthly" | "session" = allowed.includes(packageType) ? packageType : (allowed[0] as any);
   const effSessions = sessionOptions.includes(selectedSessions) ? selectedSessions : (sessionOptions[0] ?? 0);
-  const monthOptions = (
-    cx.available_months?.length ? cx.available_months : [1, 2, 3, 6, 12]
-  ).filter((m) => [1, 2, 3, 6, 12].includes(m));
+  const monthOptions = packageCounts(c, "monthly").filter((m) => m <= 12);
   const effMonths = monthOptions.includes(selectedMonths) ? selectedMonths : (monthOptions[0] ?? 1);
 
   const payMode = settings?.["payment_mode"] === "ipaymu" || settings?.["payment_mode"] === "manual"
@@ -135,26 +134,17 @@ function Bayar() {
     holder: settings?.["bank_holder"] || "Yayasan Bimbelajar",
   };
 
-  const classExtra = c as typeof c & { price_per_session?: number | null };
-  const normalMonthlyPrice = Number((c as any).price_normal ?? c.price ?? 0);
-  const promoMonthlyPrice = Number((c as any).price_promo ?? 0);
-  const monthlyPrice = promoMonthlyPrice > 0 ? promoMonthlyPrice : normalMonthlyPrice;
-
-  const normalSessionPrice = Number((c as any).price_per_session_normal ?? classExtra.price_per_session ?? 0);
-  const promoSessionPrice = Number((c as any).price_per_session_promo ?? 0);
-  const sessionPrice = promoSessionPrice > 0 ? promoSessionPrice : (normalSessionPrice > 0 ? normalSessionPrice : Math.round(c.price / 8));
-
-  const basePrice =
-    effType === "monthly"
-      ? monthlyPrice * effMonths
-      : sessionPrice * effSessions;
+  const monthlyEntry = getPackagePrice(c, "monthly", effMonths);
+  const sessionEntry = getPackagePrice(c, "session", effSessions || 1);
+  const basePrice = effType === "monthly" ? monthlyEntry.final : sessionEntry.final;
+  const start = startingPrice(c);
 
   const quote = useQuery({
-    queryKey: ["discount-quote", c?.id, applied?.code, useReward, userId, basePrice],
+    queryKey: ["discount-quote", c?.id, applied?.code, useReward, userId, effType, effType === "session" ? effSessions : effMonths],
     enabled: !!c,
     queryFn: async () => {
       if (!c) throw new Error("Kelas tidak tersedia.");
-      return discountQuote(c.id, applied?.code ?? "", useReward);
+      return discountQuote(c.id, applied?.code ?? "", useReward, { type: effType, count: effType === "session" ? effSessions : effMonths });
     },
   });
 
@@ -166,7 +156,7 @@ function Bayar() {
     if (!voucher.trim() || !c) return;
     setBusy(true);
     try {
-      const row = await discountQuote(c.id, voucher, useReward);
+      const row = await discountQuote(c.id, voucher, useReward, { type: effType, count: effType === "session" ? effSessions : effMonths });
       if (row.kind === "voucher") {
         const { data: ok } = await (supabase as any).rpc("voucher_scope_ok", {
           _code: row.code,
@@ -199,6 +189,7 @@ function Bayar() {
           amount: finalPrice,
           packageType: effType,
           sessionsTotal: effType === "session" ? effSessions : undefined,
+          packageMonths: effType === "monthly" ? effMonths : undefined,
           voucherCode: applied?.kind === "voucher" ? applied.code : null,
           referralCode: applied?.kind === "referral" ? applied.code : null,
           useReward,
@@ -242,6 +233,7 @@ function Bayar() {
             sender_name: sender.trim(),
             package_type: effType,
             sessions_total: effType === "session" ? effSessions : null,
+            package_months: effType === "monthly" ? effMonths : 1,
             voucher_code: applied?.kind === "voucher" ? applied.code : null,
             referral_code: applied?.kind === "referral" ? applied.code : null,
             use_referral_reward: useReward,
@@ -300,7 +292,7 @@ function Bayar() {
   return (
     <Page
       title={`Daftar ${c.name} — Level ${c.level_number} ${c.level_label}`}
-      subtitle={`${c.price_prefix} ${rupiah(monthlyPrice)} / ${packageUnit(c)}`}
+      subtitle={start ? `${c.price_prefix ?? ""} ${rupiah(start.final)} / ${start.label}`.trim() : ""}
     >
       {enr.isPending ? (
         <p>Memuat pendaftaran...</p>
@@ -374,8 +366,8 @@ function Bayar() {
                   }`}
                 >
                   <div className="text-xs text-muted-foreground">Langganan</div>
-                  <div className="text-sm font-bold">Bulanan (1 Bulan)</div>
-                  <div className="text-xs text-primary mt-1">{rupiah(monthlyPrice)}</div>
+                  <div className="text-sm font-bold">Paket Bulanan</div>
+                  <div className="text-xs text-primary mt-1">Pilih lama berlangganan</div>
                 </button>
                 <button
                   type="button"
@@ -395,7 +387,7 @@ function Bayar() {
           )}
           {effType === "monthly" && (
             <div className="space-y-3 rounded-2xl bg-secondary/40 p-4">
-              <Label className="text-sm font-semibold">Pilih Durasi Berlangganan</Label>
+              <Label className="text-sm font-semibold">Pilih Lama Berlangganan</Label>
 
               {monthOptions.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -413,8 +405,16 @@ function Bayar() {
                           : "border-border bg-background hover:bg-secondary"
                       }`}
                     >
-                      <span className="block text-lg font-bold">{month} Bulan</span>
-                      <span className="text-xs">{rupiah(monthlyPrice * month)}</span>
+                      <span className="block text-lg font-bold capitalize">{packageLabel("monthly", month, unitWeeks(c))}</span>
+                      {(() => {
+                        const pr = getPackagePrice(c, "monthly", month);
+                        return (
+                          <span className="block text-xs">
+                            {pr.hasPromo && <span className="mr-1 text-muted-foreground line-through">{rupiah(pr.normal)}</span>}
+                            {rupiah(pr.final)}
+                          </span>
+                        );
+                      })()}
                     </button>
                   ))}
                 </div>
@@ -422,26 +422,34 @@ function Bayar() {
                 <p className="text-sm text-muted-foreground">Belum ada durasi bulanan yang diaktifkan admin.</p>
               )}
 
-              <p className="text-xs text-muted-foreground">Harga per bulan: {rupiah(monthlyPrice)}</p>
             </div>
           )}
           {effType === "session" && (
             <div className="space-y-2 rounded-2xl bg-secondary/40 p-3">
               <Label className="text-xs font-semibold">Pilih Jumlah Pertemuan / Sesi:</Label>
               {sessionOptions.length > 0 ? (
-                <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                   {sessionOptions.map((num) => (
                     <button
                       key={num}
                       type="button"
                       onClick={() => setSelectedSessions(num)}
-                      className={`rounded-xl py-2 text-xs font-bold transition border ${
+                      className={`rounded-xl px-2 py-2 text-xs font-bold transition border ${
                         effSessions === num
                           ? "bg-primary text-primary-foreground border-primary shadow-sm"
                           : "bg-background border-border hover:bg-secondary"
                       }`}
                     >
-                      {num} Sesi
+                      <span className="block">{num} Sesi</span>
+                      {(() => {
+                        const pr = getPackagePrice(c, "session", num);
+                        return (
+                          <span className="block text-[11px] font-medium opacity-90">
+                            {pr.hasPromo && <span className="mr-1 line-through opacity-70">{rupiah(pr.normal)}</span>}
+                            {rupiah(pr.final)}
+                          </span>
+                        );
+                      })()}
                     </button>
                   ))}
                 </div>
@@ -459,7 +467,7 @@ function Bayar() {
               <p className="text-xs text-muted-foreground">Paket yang dipilih</p>
               <p className="font-semibold text-sm">
                 {effType === "monthly"
-                  ? `Paket Bulanan (${effMonths} Bulan)`
+                  ? `Paket Berlangganan (${packageLabel("monthly", effMonths, unitWeeks(c))})`
                   : `Paket ${effSessions} Sesi Pertemuan`}
               </p>
             </div>
