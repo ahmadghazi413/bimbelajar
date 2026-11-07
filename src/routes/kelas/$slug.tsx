@@ -1,16 +1,46 @@
+import { createFileRoute, notFound, Link } from "@tanstack/react-router";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { ArrowLeft, CalendarDays, Clock3, Users } from "lucide-react";
-import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { TeacherIdentity } from "@/components/TeacherIdentity";
 import { packageUnit, rupiah } from "@/lib/format";
+import { classDetailQuery } from "@/lib/queries";
+
+export const Route = createFileRoute("/kelas/$slug")({
+  loader: async ({ context, params }) => {
+    const c = await context.queryClient.ensureQueryData(classDetailQuery(params.slug));
+    if (!c) throw notFound();
+    return { name: c.name, tagline: c.tagline };
+  },
+  head: ({ loaderData }) => ({
+    meta: [
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { title: loaderData ? `${loaderData.name} — Bimbelajar` : "Kelas — Bimbelajar" },
+      { name: "description", content: loaderData?.tagline ?? "Detail kelas ngaji online." },
+      { property: "og:title", content: loaderData ? `${loaderData.name} — Bimbelajar` : "Kelas — Bimbelajar" },
+      { property: "og:description", content: loaderData?.tagline ?? "Detail kelas ngaji online." },
+    ],
+  }),
+  notFoundComponent: () => <p className="p-10 text-center">Kelas tidak ditemukan.</p>,
+  component: ClassDetailContainer,
+});
+
+function ClassDetailContainer() {
+  const { slug } = Route.useParams();
+  const { data: c } = useSuspenseQuery(classDetailQuery(slug));
+  if (!c) return null;
+  return <ClassDetailPage c={c} />;
+}
 
 export function ClassDetailPage({ c }: { c: any }) {
   const targetGender = c.target_gender;
   const genderLabel = targetGender === "ikhwan" ? "Ikhwan · Laki-laki" : targetGender === "akhwat" ? "Akhwat · Perempuan" : null;
-  const regularPrice = Number(c.price_normal ?? c.price ?? 0);
-  const promoPrice = Number(c.price_promo ?? 0);
-  const finalPrice = promoPrice > 0 ? promoPrice : regularPrice;
+  const isSessionOnly = c.package_type === "session" || (c.allowed_packages?.length === 1 && c.allowed_packages[0] === "session");
+  const regularPrice = Number(isSessionOnly ? (c.price_per_session_normal ?? c.price_per_session ?? c.price ?? 0) : (c.price_normal ?? c.price ?? 0));
+  const promoPrice = Number(isSessionOnly ? (c.price_per_session_promo ?? 0) : (c.price_promo ?? 0));
   const hasPromo = promoPrice > 0 && promoPrice < regularPrice;
+  const finalPrice = hasPromo ? promoPrice : regularPrice;
 
   return (
     <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
@@ -53,34 +83,7 @@ export function ClassDetailPage({ c }: { c: any }) {
         <Button asChild variant="hero" size="lg" className="mt-5 w-full text-base">
           <Link to="/bayar/$slug" params={{ slug: c.slug }}>Daftar kelas</Link>
         </Button>
-        <p className="mt-3 text-center text-xs text-muted-foreground">Pendaftaran aman dan mudah</p>
       </aside>
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
