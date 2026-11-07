@@ -23,7 +23,7 @@ export function IlmuTab() {
   }
 
   async function save() {
-    if (!edit?.name?.trim()) return toast.error("Nama ilmu wajib diisi.");
+    if (!edit?.name?.trim()) { toast.error("Nama ilmu wajib diisi.")); return; };
     const payload = {
       name: edit.name.trim(),
       slug: edit.slug?.trim() || slugify(edit.name),
@@ -34,7 +34,7 @@ export function IlmuTab() {
     const { error } = edit.id
       ? await sb.from("subjects").update(payload).eq("id", edit.id)
       : await sb.from("subjects").insert(payload);
-    if (error) return toast.error(error.message);
+    if (error) { toast.error(error.message); return; };
     toast.success("Ilmu disimpan.");
     setEdit(null);
     await refresh();
