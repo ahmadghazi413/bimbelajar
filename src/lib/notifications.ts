@@ -34,7 +34,7 @@ export function packageEnd(e: { paid_at?: string | null; starts_at?: string | nu
   if (!start || e.package_type === "session") return null;
   const end = new Date(start);
   const weeks = e.package_weeks && e.package_weeks > 0 ? e.package_weeks : 4;
-  if (weeks >= 4) end.setMonth(end.getMonth() + 1);
+  if (weeks >= 4) end.setMonth(end.getMonth() + Math.max(1, Math.round(weeks / 4)));
   else end.setDate(end.getDate() + weeks * 7);
   return end;
 }
