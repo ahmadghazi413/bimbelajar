@@ -1,17 +1,17 @@
 import { GraduationCap, CalendarDays, Users } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { packageUnit, rupiah } from "@/lib/format";
+import { rupiah } from "@/lib/format";
+import { startingPrice } from "@/lib/package-prices";
 import { TeacherIdentity } from "@/components/TeacherIdentity";
 
 export function ClassCard({ c }: { c: any }) {
   const targetGender = c.target_gender;
   const genderLabel = targetGender === "ikhwan" ? "Ikhwan · Laki-laki" : targetGender === "akhwat" ? "Akhwat · Perempuan" : null;
-    const isSessionOnly = c.package_type === "session" || (c.allowed_packages?.length === 1 && c.allowed_packages[0] === "session");
-  const regularPrice = Number(isSessionOnly ? (c.price_per_session_normal ?? c.price_per_session ?? c.price ?? 0) : (c.price_normal ?? c.price ?? 0));
-  const promoPrice = Number(isSessionOnly ? (c.price_per_session_promo ?? 0) : (c.price_promo ?? 0));
-  const hasPromo = promoPrice > 0 && promoPrice < regularPrice;
-  const finalPrice = hasPromo ? promoPrice : regularPrice;
+  const start = startingPrice(c);
+  const regularPrice = start?.normal ?? 0;
+  const hasPromo = !!start?.hasPromo;
+  const finalPrice = start?.final ?? 0;
   return (
     <article className="group flex h-full flex-col overflow-hidden rounded-3xl border bg-card shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5">
       <div className="h-1.5 bg-gradient-to-r from-primary via-primary/70 to-primary/20" />
@@ -51,7 +51,7 @@ export function ClassCard({ c }: { c: any }) {
         <div className="mt-auto pt-6">
           <p className="text-xs font-medium text-muted-foreground">Investasi belajar</p>
           <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-            {c.price_prefix && <span className="text-sm text-muted-foreground">{c.price_prefix}</span>}
+            {(c.price_prefix || (start && "Mulai")) && <span className="text-sm text-muted-foreground">{c.price_prefix || "Mulai"}</span>}
             {hasPromo ? (
               <>
                 <span className="text-sm text-muted-foreground line-through">{rupiah(regularPrice)}</span>
@@ -60,7 +60,7 @@ export function ClassCard({ c }: { c: any }) {
             ) : (
               <span className="font-display text-2xl font-bold text-foreground sm:text-3xl">{rupiah(regularPrice)}</span>
             )}
-            <span className="text-sm text-muted-foreground">/{packageUnit(c)}</span>
+            <span className="text-sm text-muted-foreground">/{start?.label ?? "paket"}</span>
           </div>
           <Button asChild className="mt-4 w-full rounded-xl font-semibold transition-transform group-hover:translate-y-0">
             <Link to="/kelas/$slug" params={{ slug: c.slug }}>Lihat detail kelas</Link>
@@ -70,61 +70,3 @@ export function ClassCard({ c }: { c: any }) {
     </article>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
