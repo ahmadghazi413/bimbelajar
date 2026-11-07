@@ -21,30 +21,35 @@ export function VoucherTab() {
       if (error) throw error;
       return (data ?? []) as any[];
     },
-    async function save() {
-    const code = edit.code?.trim().toUpperCase();
+  });
+  const refresh = () => qc.invalidateQueries({ queryKey: ["admin-vouchers"] });
+
+  async function save() {
+    const code = String(edit?.code ?? "").trim().toUpperCase();
     if (!code) return toast.error("Kode voucher wajib diisi.");
     const value = Number(edit.discount_value ?? 0);
     if (!(value > 0)) return toast.error("Nilai diskon harus lebih dari 0.");
     if ((edit.discount_type ?? "percent") === "percent" && value > 100) return toast.error("Diskon persen maksimal 100%.");
+    const counts = String(edit.target_counts_text ?? (edit.target_counts ?? []).join(","))
+      .split(",").map((x) => Number(x.trim())).filter((n) => Number.isInteger(n) && n > 0);
     const payload = {
       code,
       discount_type: edit.discount_type ?? "percent",
       discount_value: value,
-      max_uses: edit.max_uses ? Number(edit.max_uses) : null,
-      valid_until: edit.valid_until || null,
+      max_uses: edit.max_uses === "" || edit.max_uses == null ? null : Number(edit.max_uses),
       is_active: edit.is_active ?? true,
+      expires_at: edit.expires_at ? new Date(edit.expires_at).toISOString() : null,
       package_target: edit.package_target ?? "all",
-      target_counts: edit.target_counts?.length ? edit.target_counts : null,
+      target_counts: (edit.package_target ?? "all") === "all" ? [] : counts,
     };
-    const { error } = edit.id
-      ? await sb.from("vouchers").update(payload).eq("id", edit.id)
-      : await sb.from("vouchers").insert(payload);
+    const { error } = edit.id ? await sb.from("vouchers").update(payload).eq("id", edit.id) : await sb.from("vouchers").insert(payload);
     if (error) return toast.error(error.message.includes("duplicate") ? "Kode voucher sudah dipakai." : error.message);
     toast.success("Voucher disimpan.");
     setEdit(null);
     await refresh();
   }
+
+  const scopeLabel = (v: any) => v.package_target === "monthly" ? "Paket bulanan" : v.package_target === "session" ? "Paket per sesi" : "Semua paket";
 
   return (
     <div className="space-y-4">
