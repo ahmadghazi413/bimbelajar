@@ -104,6 +104,7 @@ export type Database = {
           allowed_packages: string[]
           available_sessions: number[]
           available_months: number[]
+          package_prices: Json
           default_session_count: number
           target_gender: string
           teacher_id: string | null
@@ -138,6 +139,7 @@ export type Database = {
           allowed_packages?: string[]
           available_sessions?: number[]
           available_months?: number[]
+          package_prices?: Json
           default_session_count?: number
           target_gender?: string
           teacher_id?: string | null
@@ -172,6 +174,7 @@ export type Database = {
           allowed_packages?: string[]
           available_sessions?: number[]
           available_months?: number[]
+          package_prices?: Json
           default_session_count?: number
           target_gender?: string
           teacher_id?: string | null
@@ -428,6 +431,7 @@ export type Database = {
           starts_at: string | null
           package_type: string
           package_weeks: number
+          package_months: number
           sessions_total: number | null
           sessions_used: number | null
           voucher_code: string | null
@@ -452,6 +456,7 @@ export type Database = {
           starts_at?: string | null
           package_type?: string
           package_weeks?: number
+          package_months?: number
           sessions_total?: number | null
           sessions_used?: number | null
           voucher_code?: string | null
@@ -476,6 +481,7 @@ export type Database = {
           starts_at?: string | null
           package_type?: string
           package_weeks?: number
+          package_months?: number
           sessions_total?: number | null
           sessions_used?: number | null
           voucher_code?: string | null
