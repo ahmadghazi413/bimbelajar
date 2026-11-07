@@ -7,11 +7,11 @@ import { TeacherIdentity } from "@/components/TeacherIdentity";
 export function ClassCard({ c }: { c: any }) {
   const targetGender = c.target_gender;
   const genderLabel = targetGender === "ikhwan" ? "Ikhwan · Laki-laki" : targetGender === "akhwat" ? "Akhwat · Perempuan" : null;
-  const regularPrice = Number(c.price_normal ?? c.price ?? 0);
-  const promoPrice = Number(c.price_promo ?? 0);
-  const finalPrice = promoPrice > 0 ? promoPrice : regularPrice;
+    const isSessionOnly = c.package_type === "session" || (c.allowed_packages?.length === 1 && c.allowed_packages[0] === "session");
+  const regularPrice = Number(isSessionOnly ? (c.price_per_session_normal ?? c.price_per_session ?? c.price ?? 0) : (c.price_normal ?? c.price ?? 0));
+  const promoPrice = Number(isSessionOnly ? (c.price_per_session_promo ?? 0) : (c.price_promo ?? 0));
   const hasPromo = promoPrice > 0 && promoPrice < regularPrice;
-
+  const finalPrice = hasPromo ? promoPrice : regularPrice;
   return (
     <article className="group flex h-full flex-col overflow-hidden rounded-3xl border bg-card shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5">
       <div className="h-1.5 bg-gradient-to-r from-primary via-primary/70 to-primary/20" />
