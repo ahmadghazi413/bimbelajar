@@ -41,12 +41,12 @@ export const referralBalanceQuery = (userId: string) => queryOptions({
     return data ?? 0;
   },
 });
-export async function discountQuote(classId: string, code: string, useReward: boolean) {
-  const { data, error } = await supabase.rpc("validate_discount", {
-    _class_id: classId, _code: code.trim(), _use_reward: useReward,
+export async function discountQuote(classId: string, code: string, useReward: boolean, pkg: { type: "monthly" | "session"; count: number }) {
+  const { data, error } = await (supabase as any).rpc("validate_discount_pkg", {
+    _class_id: classId, _code: code.trim(), _use_reward: useReward, _package: pkg.type, _count: pkg.count,
   });
   if (error) throw error;
-  const row = data?.[0];
+  const row = (data as any[] | null)?.[0];
   if (!row) throw new Error("Tidak dapat menghitung pembayaran.");
   return row;
 }
