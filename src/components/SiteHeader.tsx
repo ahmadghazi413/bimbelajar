@@ -37,6 +37,8 @@ export function SiteHeader() {
   }
 
   const item = "flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-secondary hover:text-primary";
+  const top = "rounded-xl px-3 py-2 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-primary xl:px-3.5 xl:text-[15px]";
+  const topActive = "rounded-xl bg-secondary px-3 py-2 text-sm font-semibold text-primary xl:px-3.5 xl:text-[15px]";
   const logo = logoUrl ? (
     <img src={logoUrl} alt="" className="h-9 w-auto max-w-[130px] object-contain" />
   ) : (
@@ -99,17 +101,26 @@ export function SiteHeader() {
           </Link>
         </div>
 
-        <nav className="hidden items-center gap-1 lg:flex" aria-label="Navigasi utama">
-          <Link to="/kelas" className="rounded-xl px-3.5 py-2.5 text-[15px] font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-primary">Pilih Kelas</Link>
-          <Link to="/faq" className="rounded-xl px-3.5 py-2.5 text-[15px] font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-primary">FAQ</Link>
-          <Link to="/kontak" className="rounded-xl px-3.5 py-2.5 text-[15px] font-semibold text-muted-foreground transition-colors hover:bg-secondary hover:text-primary">Kontak</Link>
+        <nav className="hidden min-w-0 items-center gap-0.5 lg:flex" aria-label="Navigasi utama">
+          <Link to="/kelas" className={top} activeProps={{ className: topActive }}>Pilih Kelas</Link>
+          <Link to={session ? "/kelas-saya" : "/auth"} className={top} activeProps={{ className: topActive }}>Kelas Saya</Link>
+          <Link to={session ? "/pembayaran" : "/auth"} className={top} activeProps={{ className: topActive }}>Pembayaran</Link>
+          <Link to={session ? "/profil" : "/auth"} className={top} activeProps={{ className: topActive }}>Profil</Link>
+          <Link to="/faq" className={top} activeProps={{ className: topActive }}>FAQ</Link>
+          <Link to="/kontak" className={top} activeProps={{ className: topActive }}>Kontak</Link>
+          {(isAdmin || isTeacher) && (
+            <Link to="/admin" className="ml-1 rounded-xl bg-primary/10 px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/15">
+              {isAdmin ? "Panel Admin" : "Panel Guru"}
+            </Link>
+          )}
         </nav>
 
         <div className="flex shrink-0 items-center gap-2">
           {session ? (
             <>
-              <span className="hidden text-sm font-medium text-muted-foreground sm:inline">Assalamu’alaikum</span>
+              <span className="hidden text-sm font-medium text-muted-foreground xl:inline">Assalamu’alaikum</span>
               <NotificationBell />
+              <Button variant="outline" size="sm" className="hidden rounded-xl lg:inline-flex" onClick={logout}>Keluar</Button>
             </>
           ) : (
             <Button asChild size="sm" className="rounded-xl px-4">
