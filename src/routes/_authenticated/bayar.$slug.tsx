@@ -175,7 +175,7 @@ function Bayar() {
         });
         if (ok === false) throw new Error("Voucher ini tidak berlaku untuk paket yang dipilih.");
       }
-      setApplied({ code: row.code, kind: row.kind });
+      setApplied({ code: row.code ?? "", kind: row.kind ?? "" });
       toast.success(`Kode diterapkan. Diskon ${rupiah(row.discount)}.`);
     } catch (error) {
       toast.error(
