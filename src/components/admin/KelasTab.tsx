@@ -42,7 +42,7 @@ export function KelasTab() {
     setEdit({ ...c, whatsapp_link: data?.whatsapp_link ?? "", zoom_link: data?.zoom_link ?? "" });
   }
 
-  async function save() {
+    async function save() {
     if (!edit?.name?.trim() || !edit.subject_id) return toast.error("Nama kelas dan ilmu wajib diisi.");
     const pkgs: string[] = edit.allowed_packages?.length ? edit.allowed_packages : ["monthly"];
     const hasMonthly = pkgs.includes("monthly");
@@ -59,7 +59,6 @@ export function KelasTab() {
     if (hasMonthly && !(edit.available_months?.length)) return toast.error("Pilih minimal satu lama paket bulanan.");
 
     const sessionOnly = hasSession && !hasMonthly;
-    // Kolom price/price_per_session dipakai database untuk menghitung tagihan, jadi harus berisi harga yang berlaku (promo bila ada).
     const effMonthly = promoM > 0 ? promoM : normalM;
     const effSession = promoS > 0 ? promoS : normalS;
     const lvl = Number(edit.level_number ?? 1);
