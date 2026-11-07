@@ -1,9 +1,10 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookOpen, Download, Menu, MessageCircle } from "lucide-react";
+import { BookOpen, ChevronDown, Download, LogOut, Menu, MessageCircle, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { settingsQuery } from "@/lib/queries";
@@ -108,11 +109,6 @@ export function SiteHeader() {
           <Link to={session ? "/profil" : "/auth"} className={top} activeProps={{ className: topActive }}>Profil</Link>
           <Link to="/faq" className={top} activeProps={{ className: topActive }}>FAQ</Link>
           <Link to="/kontak" className={top} activeProps={{ className: topActive }}>Kontak</Link>
-          {(isAdmin || isTeacher) && (
-            <Link to="/admin" className="ml-1 rounded-xl bg-primary/10 px-3 py-2 text-sm font-semibold text-primary transition-colors hover:bg-primary/15">
-              {isAdmin ? "Panel Admin" : "Panel Guru"}
-            </Link>
-          )}
         </nav>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -120,7 +116,28 @@ export function SiteHeader() {
             <>
               <span className="hidden text-sm font-medium text-muted-foreground xl:inline">Assalamu’alaikum</span>
               <NotificationBell />
-              <Button variant="outline" size="sm" className="hidden rounded-xl lg:inline-flex" onClick={logout}>Keluar</Button>
+              {isAdmin || isTeacher ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="hidden gap-1.5 rounded-xl lg:inline-flex">
+                      <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+                      {isAdmin ? "Admin" : "Guru"}
+                      <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem onSelect={() => navigate({ to: "/admin" })}>
+                      <ShieldCheck className="mr-2 h-4 w-4" /> {isAdmin ? "Panel Admin" : "Panel Guru"}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={logout}>
+                      <LogOut className="mr-2 h-4 w-4" /> Keluar
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <Button variant="outline" size="sm" className="hidden rounded-xl lg:inline-flex" onClick={logout}>Keluar</Button>
+              )}
             </>
           ) : (
             <Button asChild size="sm" className="rounded-xl px-4">
