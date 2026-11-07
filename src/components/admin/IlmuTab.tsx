@@ -23,7 +23,7 @@ export function IlmuTab() {
   }
 
   async function save() {
-    if (!edit?.name?.trim()) { toast.error("Nama ilmu wajib diisi.")); return; };
+    if (!edit?.name?.trim()) return toast.error("Nama ilmu wajib diisi.");
     const payload = {
       name: edit.name.trim(),
       slug: edit.slug?.trim() || slugify(edit.name),
