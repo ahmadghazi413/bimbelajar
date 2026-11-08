@@ -124,10 +124,10 @@ export function SesiTab({ allowedClassIds }: { allowedClassIds?: string[] | "all
           <DialogContent className="max-h-[90dvh] max-w-xl overflow-y-auto">
             <DialogHeader><DialogTitle>{edit.id ? "Ubah sesi" : "Tambah sesi"}</DialogTitle></DialogHeader>
             <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><Label>Level</Label><Input type="number" min={1} value={edit.level} onChange={(e) => set("level", Number(e.target.value))} /></div>
-                <div className="space-y-1"><Label>Nomor sesi</Label><Input type="number" min={1} value={edit.number} onChange={(e) => set("number", Number(e.target.value))} /></div>
-              </div>
+              <div className="space-y-1">
+  <Label>Nomor sesi</Label>
+  <Input type="number" min={1} value={edit.number} onChange={(e) => set("number", Number(e.target.value))} placeholder="Misal: 1" />
+</div>
               <div className="space-y-1"><Label>Judul</Label><Input value={edit.title} onChange={(e) => set("title", e.target.value)} /></div>
               <div className="space-y-1"><Label>Deskripsi</Label><Textarea value={edit.description ?? ""} onChange={(e) => set("description", e.target.value)} /></div>
               <div className="space-y-1"><Label>Jadwal sesi</Label><Input value={edit.scheduled_at ?? ""} onChange={(e) => set("scheduled_at", e.target.value)} placeholder="Jumat, 14 Nov 2026 · 19.30 WIB" /></div>
