@@ -237,7 +237,8 @@ export function StudentSessions({
       )}
     </ol>
   );
-})}
-    </Accordion>
+        )
+      )}
+    </ol>
   );
 }
