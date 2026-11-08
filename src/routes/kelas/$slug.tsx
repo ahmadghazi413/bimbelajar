@@ -3,7 +3,8 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { ArrowLeft, CalendarDays, Clock3, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TeacherIdentity } from "@/components/TeacherIdentity";
-import { packageUnit, rupiah } from "@/lib/format";
+import { rupiah } from "@/lib/format";
+import { getPackagePrice, packageCounts, packageLabel, startingPrice, unitWeeks } from "@/lib/package-prices";
 import { classDetailQuery } from "@/lib/queries";
 
 export const Route = createFileRoute("/kelas/$slug")({
@@ -36,11 +37,15 @@ function ClassDetailContainer() {
 export function ClassDetailPage({ c }: { c: any }) {
   const targetGender = c.target_gender;
   const genderLabel = targetGender === "ikhwan" ? "Ikhwan · Laki-laki" : targetGender === "akhwat" ? "Akhwat · Perempuan" : null;
-  const isSessionOnly = c.package_type === "session" || (c.allowed_packages?.length === 1 && c.allowed_packages[0] === "session");
-  const regularPrice = Number(isSessionOnly ? (c.price_per_session_normal ?? c.price_per_session ?? c.price ?? 0) : (c.price_normal ?? c.price ?? 0));
-  const promoPrice = Number(isSessionOnly ? (c.price_per_session_promo ?? 0) : (c.price_promo ?? 0));
-  const hasPromo = promoPrice > 0 && promoPrice < regularPrice;
-  const finalPrice = hasPromo ? promoPrice : regularPrice;
+  const start = startingPrice(c);
+  const regularPrice = start?.normal ?? 0;
+  const hasPromo = !!start?.hasPromo;
+  const finalPrice = start?.final ?? 0;
+  const allowedKinds: ("monthly" | "session")[] = (c.allowed_packages?.length ? c.allowed_packages : ["monthly"]);
+  const priceRows = allowedKinds.flatMap((kind) => {
+    const counts = packageCounts(c, kind);
+    return (counts.length ? counts : [1]).map((count) => ({ key: `${kind}-${count}`, label: packageLabel(kind, count, unitWeeks(c)), ...getPackagePrice(c, kind, count) }));
+  }).filter((r) => r.final > 0);
 
   return (
     <div className="mt-5 grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
@@ -73,7 +78,20 @@ export function ClassDetailPage({ c }: { c: any }) {
             <span>{rupiah(regularPrice)}</span>
           )}
         </p>
-        <p className="mt-0.5 text-sm text-muted-foreground">per {packageUnit(c)}</p>
+        <p className="mt-0.5 text-sm text-muted-foreground">mulai dari paket {start?.label ?? ""}</p>
+        {priceRows.length > 1 && (
+          <ul className="mt-3 space-y-1.5 rounded-2xl bg-secondary/40 p-3 text-sm">
+            {priceRows.map((r) => (
+              <li key={r.key} className="flex items-baseline justify-between gap-3">
+                <span className="text-muted-foreground">{r.label}</span>
+                <span className="font-semibold text-foreground">
+                  {r.hasPromo && <span className="mr-1.5 text-xs font-normal text-muted-foreground line-through">{rupiah(r.normal)}</span>}
+                  {rupiah(r.final)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
         <div className="my-4 border-t" />
         <div className="space-y-3 text-sm">
           <p className="flex items-start gap-2.5"><CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-primary" /><span>{c.schedule}</span></p>
