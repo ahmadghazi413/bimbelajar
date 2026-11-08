@@ -233,12 +233,9 @@ export function StudentSessions({
             res={data?.res.find((x) => x.session_id === s.id)}
             onChanged={() => qc.invalidateQueries({ queryKey: key })}
           />
-        )
-      )}
-    </ol>
-  );
-        )
+                )
       )}
     </ol>
   );
 }
+
