@@ -2,6 +2,9 @@ export function classesInSubject<T extends { subject_id: string | null }>(classe
   return classes.filter((c) => c.subject_id === subjectId);
 }
 
-export function classLevelName(c: { name: string; level_number: number; level_label: string }) {
+export function classLevelName(c: { name: string; level_number: number; level_label: string; target_gender?: string | null }) {
+  const gender = c.target_gender === "ikhwan" ? "[Ikhwan] " : c.target_gender === "akhwat" ? "[Akhwat] " : "";
+  return `${gender}${c.name}`;
+}
   return `${c.name} · Level ${c.level_number} · ${c.level_label}`;
 }
