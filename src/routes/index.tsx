@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,10 @@ import {
   Languages,
   Check,
   Play,
-  Clock
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+  BookOpen
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,15 +42,16 @@ export const Route = createFileRoute("/")({
 function IndexPage() {
   const { session } = useAuth();
   const userId = session?.user?.id;
+  const [activeSlide, setActiveSlide] = useState(0);
 
-  // 1. Ambil data santri aktif jika login
+  // 1. Ambil data santri aktif dan sesi kelas jika login
   const { data: userData } = useQuery({
     queryKey: ["home-user-data", userId],
     enabled: !!userId,
     queryFn: async () => {
       const { data: enr } = await supabase
         .from("enrollments")
-        .select("*, classes(*)")
+        .select("*, classes(*, class_sessions(*))")
         .eq("user_id", userId!)
         .neq("status", "rejected")
         .order("created_at", { ascending: false });
@@ -65,8 +70,20 @@ function IndexPage() {
   // 2. Ambil data bidang ilmu dari database
   const { data: subjects = [] } = useQuery(subjectsQuery);
 
-  const enrollments = userData?.enr ?? [];
-  const activePaidEnrollment = enrollments.find((e) => {
+  // Filter kelas unik yang diikuti (jika ikut Tahsin, Webinar, dsb)
+  const allEnr = userData?.enr ?? [];
+  const startOf = (x: any) => x.starts_at ?? x.paid_at ?? x.created_at ?? "";
+  const pickedMap = new Map<string, (typeof allEnr)[number]>();
+  for (const x of allEnr) {
+    const cur = pickedMap.get(x.class_id);
+    if (!cur) pickedMap.set(x.class_id, x);
+    else if (x.status === "paid" && (cur.status !== "paid" || startOf(x) > startOf(cur))) {
+      pickedMap.set(x.class_id, x);
+    }
+  }
+  const myClasses = [...pickedMap.values()].filter((e) => !!e.classes);
+
+  const activePaidEnrollment = myClasses.find((e) => {
     if (e.status !== "paid") return false;
     const end = packageEnd(e);
     if (!end) return true;
@@ -80,9 +97,14 @@ function IndexPage() {
     session?.user?.email?.split("@")[0] ||
     "Santri";
 
-  const primaryEnrollment = activePaidEnrollment || enrollments[0];
-  const primaryClass = primaryEnrollment?.classes;
-  const primaryPriv = userData?.priv?.find((p) => p.class_id === primaryEnrollment?.class_id);
+  const currentEnrollment = myClasses[Math.min(activeSlide, Math.max(0, myClasses.length - 1))];
+  const currentClass = currentEnrollment?.classes as any;
+  const currentPriv = userData?.priv?.find((p) => p.class_id === currentEnrollment?.class_id);
+
+  // Ambil daftar sesi kelas yang terbit
+  const currentSessions: any[] = (currentClass?.class_sessions ?? [])
+    .filter((s: any) => s.is_published !== false)
+    .sort((a: any, b: any) => (a.number ?? 0) - (b.number ?? 0));
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -107,7 +129,7 @@ function IndexPage() {
             <div>
               {isPremium ? (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
-                  <Crown className="h-3.5 w-3.5 text-amber-500" /> Santri Aktif
+                  <Crown className="h-3.5 w-3.5 text-amber-500" /> Premium
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground border">
@@ -172,40 +194,76 @@ function IndexPage() {
             </div>
           </div>
 
-          {/* SISI KANAN: KARTU PRATINJAU / KELAS SAYA */}
+          {/* SISI KANAN: KARTU KELAS SAYA / PRATINJAU */}
           <div className="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-br from-emerald-100/60 via-amber-50/50 to-emerald-50/40 dark:from-emerald-950/20 dark:via-card dark:to-card border border-primary/20 shadow-lg">
-            {primaryEnrollment && primaryClass ? (
+            {myClasses.length > 0 && currentClass ? (
               <div className="bg-card rounded-2xl p-6 border shadow-md space-y-4">
+                {/* Header Kartu + Kontrol Geser / Sliding Kanan Kiri */}
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-muted-foreground">Kelas saya</span>
-                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                    primaryEnrollment.status === "paid"
-                      ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30"
-                      : "bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30"
-                  }`}>
-                    {primaryEnrollment.status === "paid" ? "Sedang Berjalan" : "Menunggu Verifikasi"}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-muted-foreground">Kelas saya</span>
+                    {myClasses.length > 1 && (
+                      <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                        {activeSlide + 1} dari {myClasses.length}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {myClasses.length > 1 && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setActiveSlide((prev) => (prev > 0 ? prev - 1 : myClasses.length - 1))}
+                          className="p-1 rounded-lg border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                          title="Kelas sebelumnya"
+                        >
+                          <ChevronLeft className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveSlide((prev) => (prev < myClasses.length - 1 ? prev + 1 : 0))}
+                          className="p-1 rounded-lg border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                          title="Kelas berikutnya"
+                        >
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                      currentEnrollment.status === "paid"
+                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30"
+                        : "bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30"
+                    }`}>
+                      {currentEnrollment.status === "paid" ? "Sedang Berjalan" : "Menunggu Verifikasi"}
+                    </span>
+                  </div>
                 </div>
 
+                {/* Judul Kelas (bisa diklik menuju Kelas Saya) */}
                 <div>
-                  <h3 className="font-display text-xl sm:text-2xl font-bold text-primary">
-                    {primaryClass.name}
-                  </h3>
-                  {primaryClass.schedule && (
+                  <Link to="/kelas-saya" className="group block">
+                    <h3 className="font-display text-xl sm:text-2xl font-bold text-primary group-hover:underline flex items-center justify-between">
+                      <span>{currentClass.name}</span>
+                      <ArrowRight className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    </h3>
+                  </Link>
+                  {currentClass.schedule && (
                     <p className="text-xs sm:text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
                       <CalendarDays className="h-4 w-4 text-primary shrink-0" />
-                      {primaryClass.schedule}
+                      {currentClass.schedule}
                     </p>
                   )}
                 </div>
 
-                {primaryEnrollment.status === "paid" && (
+                {/* Info Paket */}
+                {currentEnrollment.status === "paid" && (
                   <div className="rounded-xl bg-muted/60 p-3.5 space-y-1 text-xs sm:text-sm">
                     <p className="font-semibold text-foreground">
-                      Paket {packageTitle(primaryEnrollment)}
+                      Paket {packageTitle(currentEnrollment)}
                     </p>
                     {(() => {
-                      const end = packageEnd(primaryEnrollment);
+                      const end = packageEnd(currentEnrollment);
                       if (end) {
                         const d = daysLeft(end);
                         return (
@@ -214,7 +272,7 @@ function IndexPage() {
                           </p>
                         );
                       }
-                      const pkg = primaryEnrollment as unknown as { sessions_total?: number | null; sessions_used?: number | null };
+                      const pkg = currentEnrollment as unknown as { sessions_total?: number | null; sessions_used?: number | null };
                       const total = pkg.sessions_total || 0;
                       const used = pkg.sessions_used || 0;
                       return (
@@ -226,21 +284,51 @@ function IndexPage() {
                   </div>
                 )}
 
-                <div className="pt-2">
-                  {primaryPriv?.whatsapp_link && primaryEnrollment.status === "paid" ? (
-                    <Button asChild className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold rounded-xl h-11">
-                      <a href={primaryPriv.whatsapp_link} target="_blank" rel="noreferrer">
-                        <MessageCircle className="h-4 w-4 mr-1.5" /> Gabung Grup WhatsApp
-                      </a>
-                    </Button>
+                {/* Daftar Pelajaran / Sesi (Sesuai Foto Pratinjau) */}
+                <div className="space-y-2 pt-2 border-t border-border/70 text-xs sm:text-sm">
+                  {currentSessions.length > 0 ? (
+                    currentSessions.slice(0, 3).map((s: any, idx: number) => (
+                      <div key={s.id || idx} className="flex items-center justify-between py-1">
+                        <div className="flex items-center gap-2">
+                          <span className="grid h-6 w-6 place-items-center rounded-lg bg-primary/10 text-primary text-xs font-bold">
+                            {s.number || idx + 1}
+                          </span>
+                          <span className="font-medium text-foreground line-clamp-1">
+                            {s.title || `Sesi ${s.number}`}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground font-medium shrink-0 ml-2">
+                          {s.scheduled_at ? new Date(s.scheduled_at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }) + " WIB" : "Tersedia"}
+                        </span>
+                      </div>
+                    ))
                   ) : (
-                    <Button asChild className="w-full font-bold rounded-xl h-11">
-                      <Link to="/kelas-saya">Buka Kelas Saya</Link>
+                    <div className="py-2 text-xs text-muted-foreground flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 text-primary shrink-0" />
+                      <span>Jadwal & materi sesi lengkap tersedia di halaman Kelas Saya.</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Tombol Aksi */}
+                <div className="pt-2 space-y-2">
+                  <Button asChild className="w-full font-bold rounded-xl h-11 shadow-sm">
+                    <Link to="/kelas-saya">
+                      Buka Kelas Saya <ArrowRight className="h-4 w-4 ml-1.5" />
+                    </Link>
+                  </Button>
+
+                  {currentPriv?.whatsapp_link && currentEnrollment.status === "paid" && (
+                    <Button asChild className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-bold rounded-xl h-10 text-xs sm:text-sm">
+                      <a href={currentPriv.whatsapp_link} target="_blank" rel="noreferrer">
+                        <MessageCircle className="h-4 w-4 mr-1.5" /> Gabung WhatsApp Kelas
+                      </a>
                     </Button>
                   )}
                 </div>
               </div>
             ) : (
+              /* Tampilan Pratinjau Alur jika belum login atau belum daftar kelas */
               <div className="bg-card rounded-2xl p-6 border shadow-md space-y-4">
                 <div className="flex items-center justify-between gap-2 text-xs font-semibold">
                   <span className="text-muted-foreground">Pratinjau Kelas</span>
