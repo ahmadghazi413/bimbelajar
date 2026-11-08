@@ -2,7 +2,6 @@ import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { FileText, PlayCircle, Upload, Video as VideoIcon } from "lucide-react";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { SessionList } from "@/components/SessionList";
 import { supabase } from "@/integrations/supabase/client";
@@ -233,9 +232,8 @@ export function StudentSessions({
             res={data?.res.find((x) => x.session_id === s.id)}
             onChanged={() => qc.invalidateQueries({ queryKey: key })}
           />
-          )
+        ),
       )}
     </ol>
   );
 }
-
