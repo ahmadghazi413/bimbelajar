@@ -6,5 +6,3 @@ export function classLevelName(c: { name: string; level_number: number; level_la
   const gender = c.target_gender === "ikhwan" ? "[Ikhwan] " : c.target_gender === "akhwat" ? "[Akhwat] " : "";
   return `${gender}${c.name}`;
 }
-  return `${c.name} · Level ${c.level_number} · ${c.level_label}`;
-}
