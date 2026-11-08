@@ -210,43 +210,34 @@ export function StudentSessions({
     );
   }
 
-  const levels = [...new Set(sessions.map((s) => s.level))].sort();
   return (
-    <Accordion type="single" collapsible defaultValue={`l${levels[0]}`} className="space-y-3">
-      {levels.map((lv) => {
-        const list = sessions.filter((s) => s.level === lv);
-        return (
-          <AccordionItem key={lv} value={`l${lv}`} className="rounded-2xl border bg-card px-4">
-            <AccordionTrigger className="text-lg font-semibold">Level {lv} · {list.length} sesi</AccordionTrigger>
-            <AccordionContent>
-              <ol className="space-y-5">
-                {list.map((s) =>
-                  unlockedCount != null && order.indexOf(s.id) + 1 > unlockedCount ? (
-                    <li key={s.id} className="rounded-xl border border-dashed p-3 text-sm">
-                      <p className="font-semibold">🔒 Sesi {s.number}: {s.title}</p>
-                      <p className="text-muted-foreground">Paket Anda mencakup {unlockedCount} sesi. Buka sisa sesi untuk melanjutkan.</p>
-                      {renewSlug && (
-                        <a href={`/bayar/${renewSlug}`} className="mt-2 inline-block font-semibold text-primary underline">Buka Sisa Sesi Kelas</a>
-                      )}
-                    </li>
-                  ) : (
-                  <SessionItem
-                    key={s.id}
-                    s={s}
-                    classId={classId}
-                    userId={userId}
-                    priv={data?.priv.find((x) => x.session_id === s.id)}
-                    rec={data?.rec.find((x) => x.session_id === s.id)}
-                    sub={data?.sub.find((x) => x.session_id === s.id)}
-                    res={data?.res.find((x) => x.session_id === s.id)}
-                    onChanged={() => qc.invalidateQueries({ queryKey: key })}
-                  />
-                  ))}
-              </ol>
-            </AccordionContent>
-          </AccordionItem>
-        );
-      })}
+    <ol className="space-y-4">
+      {sessions.map((s) =>
+        unlockedCount != null && order.indexOf(s.id) + 1 > unlockedCount ? (
+          <li key={s.id} className="rounded-xl border border-dashed p-3 text-sm">
+            <p className="font-semibold">🔒 Sesi {s.number}: {s.title}</p>
+            <p className="text-muted-foreground">Paket Anda mencakup {unlockedCount} sesi. Buka sisa sesi untuk melanjutkan.</p>
+            {renewSlug && (
+              <a href={`/bayar/${renewSlug}`} className="mt-2 inline-block font-semibold text-primary underline">Buka Sisa Sesi Kelas</a>
+            )}
+          </li>
+        ) : (
+          <SessionItem
+            key={s.id}
+            s={s}
+            classId={classId}
+            userId={userId}
+            priv={data?.priv.find((x) => x.session_id === s.id)}
+            rec={data?.rec.find((x) => x.session_id === s.id)}
+            sub={data?.sub.find((x) => x.session_id === s.id)}
+            res={data?.res.find((x) => x.session_id === s.id)}
+            onChanged={() => qc.invalidateQueries({ queryKey: key })}
+          />
+        )
+      )}
+    </ol>
+  );
+})}
     </Accordion>
   );
 }
