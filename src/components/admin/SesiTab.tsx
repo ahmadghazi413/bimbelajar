@@ -107,7 +107,7 @@ export function SesiTab({ allowedClassIds }: { allowedClassIds?: string[] | "all
       {sessions.data?.map((s) => (
         <div key={s.id} className="flex items-center justify-between gap-3 rounded-2xl border bg-card p-4">
           <div className="min-w-0">
-            <p className="font-semibold">L{s.level} · Sesi {s.number}: {s.title}</p>
+            <p className="font-semibold">Sesi {s.number}: {s.title}</p>
             <p className="text-sm text-muted-foreground">{s.scheduled_at || "Jadwal belum diisi"} · {s.is_published ? "Terbit" : "Draf (tersembunyi)"}</p>
           </div>
           <div className="flex shrink-0 gap-2">
