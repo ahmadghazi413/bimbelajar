@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,7 @@ function IndexPage() {
   const { session } = useAuth();
   const userId = session?.user?.id;
   const [activeSlide, setActiveSlide] = useState(0);
+  const touchX = useRef<number | null>(null);
 
   // 1. Ambil data santri aktif dan sesi kelas jika login
   const { data: userData } = useQuery({
@@ -97,7 +98,20 @@ function IndexPage() {
     session?.user?.email?.split("@")[0] ||
     "Santri";
 
-  const currentEnrollment = myClasses[Math.min(activeSlide, Math.max(0, myClasses.length - 1))];
+  const slideIndex = Math.min(activeSlide, Math.max(0, myClasses.length - 1));
+  const goPrev = () => setActiveSlide(slideIndex > 0 ? slideIndex - 1 : myClasses.length - 1);
+  const goNext = () => setActiveSlide(slideIndex < myClasses.length - 1 ? slideIndex + 1 : 0);
+  const onTouchStart = (e: React.TouchEvent) => { touchX.current = e.touches[0]?.clientX ?? null; };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const start = touchX.current;
+    touchX.current = null;
+    if (start == null || myClasses.length < 2) return;
+    const dx = (e.changedTouches[0]?.clientX ?? start) - start;
+    if (Math.abs(dx) < 50) return;
+    if (dx < 0) goNext(); else goPrev();
+  };
+
+  const currentEnrollment = myClasses[slideIndex];
   const currentClass = currentEnrollment?.classes as any;
   const currentPriv = userData?.priv?.find((p) => p.class_id === currentEnrollment?.class_id);
 
@@ -197,14 +211,14 @@ function IndexPage() {
           {/* SISI KANAN: KARTU KELAS SAYA / PRATINJAU */}
           <div className="relative rounded-3xl p-6 sm:p-8 bg-gradient-to-br from-emerald-100/60 via-amber-50/50 to-emerald-50/40 dark:from-emerald-950/20 dark:via-card dark:to-card border border-primary/20 shadow-lg">
             {myClasses.length > 0 && currentClass ? (
-              <div className="bg-card rounded-2xl p-6 border shadow-md space-y-4">
+              <div className="bg-card rounded-2xl p-6 border shadow-md space-y-4 touch-pan-y" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
                 {/* Header Kartu + Kontrol Geser / Sliding Kanan Kiri */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-semibold text-muted-foreground">Kelas saya</span>
                     {myClasses.length > 1 && (
                       <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                        {activeSlide + 1} dari {myClasses.length}
+                        {slideIndex + 1} dari {myClasses.length}
                       </span>
                     )}
                   </div>
@@ -214,7 +228,7 @@ function IndexPage() {
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => setActiveSlide((prev) => (prev > 0 ? prev - 1 : myClasses.length - 1))}
+                          onClick={goPrev}
                           className="p-1 rounded-lg border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                           title="Kelas sebelumnya"
                         >
@@ -222,7 +236,7 @@ function IndexPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setActiveSlide((prev) => (prev < myClasses.length - 1 ? prev + 1 : 0))}
+                          onClick={goNext}
                           className="p-1 rounded-lg border hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                           title="Kelas berikutnya"
                         >
@@ -255,6 +269,22 @@ function IndexPage() {
                     </p>
                   )}
                 </div>
+
+                {myClasses.length > 1 && (
+                  <div className="flex justify-center gap-1.5" role="tablist" aria-label="Pilih kelas">
+                    {myClasses.map((e, i) => (
+                      <button
+                        key={e.class_id}
+                        type="button"
+                        role="tab"
+                        aria-selected={i === slideIndex}
+                        aria-label={`Kelas ${i + 1}: ${(e.classes as any)?.name ?? ""}`}
+                        onClick={() => setActiveSlide(i)}
+                        className={`h-2 rounded-full transition-all ${i === slideIndex ? "w-5 bg-primary" : "w-2 bg-muted-foreground/30"}`}
+                      />
+                    ))}
+                  </div>
+                )}
 
                 {/* Info Paket */}
                 {currentEnrollment.status === "paid" && (
