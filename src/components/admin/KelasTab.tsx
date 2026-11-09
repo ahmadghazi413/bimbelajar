@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Pencil } from "lucide-react";
+import { Copy, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -98,6 +98,24 @@ export function KelasTab() {
       ...c, whatsapp_link: data?.whatsapp_link ?? "", zoom_link: data?.zoom_link ?? "",
       available_months: (() => { const ok = packageCounts(c, "monthly").filter((m) => monthlyChoices(unitWeeks(c)).includes(m)); return ok.length ? ok : [1]; })(), available_sessions: packageCounts(c, "session"),
       prices: initialPrices(c), slots, legacySchedule: slots.length ? "" : (c.schedule ?? ""),
+    });
+  }
+  async function duplicate(c: any) {
+    const { data } = await sb.from("class_private").select("*").eq("class_id", c.id).maybeSingle();
+    const slots = parseSchedule(c.schedule);
+    setEdit({
+      ...c,
+      id: undefined, // Kosongkan id agar disimpan sebagai kelas baru
+      slug: "",      // Kosongkan slug agar sistem membuat URL baru
+      name: `${c.name} (Rombel Baru)`,
+      sort_order: classes.length + 1,
+      whatsapp_link: data?.whatsapp_link ?? "",
+      zoom_link: data?.zoom_link ?? "",
+      available_months: (() => { const ok = packageCounts(c, "monthly").filter((m) => monthlyChoices(unitWeeks(c)).includes(m)); return ok.length ? ok : [1]; })(),
+      available_sessions: packageCounts(c, "session"),
+      prices: initialPrices(c),
+      slots,
+      legacySchedule: slots.length ? "" : (c.schedule ?? ""),
     });
   }
 
@@ -284,7 +302,10 @@ export function KelasTab() {
                 </p>
               )}
             </div>
-            <div className="flex shrink-0 gap-2">
+                        <div className="flex shrink-0 gap-2">
+              <Button variant="outline" size="icon" aria-label={`Duplikat ${c.name}`} title="Duplikat kelas (rombel baru)" onClick={() => duplicate(c)}>
+                <Copy className="h-4 w-4" />
+              </Button>
               <Button variant="outline" size="icon" aria-label={`Ubah ${c.name}`} onClick={() => open(c)}><Pencil className="h-4 w-4" /></Button>
               <AdminDelete name={c.name} description="Kelas kosong beserta sesi dan rekamannya dihapus permanen. Kelas yang sudah punya pendaftar tidak bisa dihapus, nonaktifkan saja."
                 onDelete={async () => { const { error } = await sb.from("classes").delete().eq("id", c.id); if (error) throw new Error(error.message); await refresh(); }} />
