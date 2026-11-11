@@ -24,6 +24,7 @@ export function SesiTab({ allowedClassIds, teacherId, allowAll }: { allowedClass
       : allowedClassIds && Array.isArray(allowedClassIds)
         ? allClasses.filter((c) => allowedClassIds.includes(c.id))
         : allClasses;
+  const subjectIds = new Set(classes.map((c) => c.subject_id));
   const visibleSubjects = subjects.filter((s) => subjectIds.has(s.id));
   const [subjectId, setSubjectId] = useState("");
   const [classId, setClassId] = useState("");
