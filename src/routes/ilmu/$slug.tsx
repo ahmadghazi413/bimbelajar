@@ -1,9 +1,12 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, BookOpen, Check, UsersRound } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Check, GraduationCap, Users, UsersRound } from "lucide-react";
+import { useMemo, useState } from "react";
 import { subjectClassesQuery } from "@/lib/queries";
-import { ClassCard } from "@/components/ClassCard";
+import { TeacherIdentity } from "@/components/TeacherIdentity";
+import { Button } from "@/components/ui/button";
+import { rupiah } from "@/lib/format";
+import { startingPrice } from "@/lib/package-prices";
 import {
   Carousel,
   CarouselContent,
@@ -37,9 +40,9 @@ export const Route = createFileRoute("/ilmu/$slug")({
     meta: [
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { title: loaderData ? `${loaderData.name} — Bimbelajar` : "Ilmu — Bimbelajar" },
+      { title: loaderData ? `${loaderData.name} — PadatIlmu` : "Ilmu — PadatIlmu" },
       { name: "description", content: loaderData?.bio || "Pilih kelas dan level yang sesuai." },
-      { property: "og:title", content: loaderData ? `${loaderData.name} — Bimbelajar` : "Ilmu — Bimbelajar" },
+      { property: "og:title", content: loaderData ? `${loaderData.name} — PadatIlmu` : "Ilmu — PadatIlmu" },
       { property: "og:description", content: loaderData?.bio || "Pilih kelas dan level yang sesuai." },
     ],
   }),
@@ -60,6 +63,37 @@ function IlmuPage() {
     ? classes.filter((c) => matchesTargetGender(c as typeof c & ClassWithGender, selectedGender))
     : classes;
   const selectedOption = genderOptions.find((option) => option.value === selectedGender) ?? genderOptions[0];
+
+  // Menggabungkan kelas rombel (Kelas A, B, C) dengan level & gender sama jadi 1 kartu program
+  const groupedPrograms = useMemo(() => {
+    const groups: Record<string, any[]> = {};
+
+    for (const c of visibleClasses) {
+      const key = c.level_number
+        ? `lvl-${c.level_number}-${c.target_gender ?? "all"}`
+        : `cls-${c.name.replace(/[\s\-_]+Kelas\s+[A-Za-z0-9]+$/i, "").trim()}-${c.target_gender ?? "all"}`;
+
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(c);
+    }
+
+    return Object.values(groups).map((rombels) => {
+      rombels.sort((a, b) => (a.sort_order ?? 99) - (b.sort_order ?? 99) || a.name.localeCompare(b.name));
+      const primary = rombels[0];
+      const cleanName = primary.name
+        .replace(/[\s\-_]+Kelas\s+[A-Za-z0-9]+$/i, "")
+        .trim();
+
+      return {
+        primaryClass: primary,
+        rombels,
+        rombelCount: rombels.length,
+        cleanName: cleanName || primary.name,
+      };
+    });
+  }, [visibleClasses]);
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 sm:py-10">
@@ -142,17 +176,19 @@ function IlmuPage() {
       <section className="mt-9 sm:mt-10" aria-live="polite">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">{isTahsinPage ? selectedOption.label : "Kelas tersedia"}</p>
-            <h2 className="mt-1 text-xl font-bold text-foreground sm:text-2xl">Pilih kelas</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              {isTahsinPage ? selectedOption.label : "Kelas tersedia"}
+            </p>
+            <h2 className="mt-1 text-xl font-bold text-foreground sm:text-2xl">Pilih program belajar</h2>
           </div>
-          {visibleClasses.length > 0 && (
+          {groupedPrograms.length > 0 && (
             <span className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">
-              {visibleClasses.length} {visibleClasses.length === 1 ? "kelas" : "kelas"}
+              {groupedPrograms.length} program
             </span>
           )}
         </div>
 
-        {visibleClasses.length > 0 ? (
+        {groupedPrograms.length > 0 ? (
           <>
             <Carousel
               key={`${slug}-${selectedGender}`}
@@ -160,24 +196,24 @@ function IlmuPage() {
               className="mt-4 px-0 sm:px-6"
             >
               <CarouselContent className="-ml-4">
-                {visibleClasses.map((c) => (
-                  <CarouselItem key={c.id} className="basis-[88%] pl-4 sm:basis-1/2 lg:basis-1/3">
+                {groupedPrograms.map((group) => (
+                  <CarouselItem key={group.primaryClass.id} className="basis-[88%] pl-4 sm:basis-1/2 lg:basis-1/3">
                     <div className="h-full [&>div]:h-full">
-                      <ClassCard c={c} />
+                      <ProgramCard group={group} />
                     </div>
                   </CarouselItem>
                 ))}
               </CarouselContent>
-              {visibleClasses.length > 1 && (
+              {groupedPrograms.length > 1 && (
                 <>
-                  <CarouselPrevious aria-label="Kelas sebelumnya" className="-left-1 hidden h-9 w-9 sm:inline-flex" />
-                  <CarouselNext aria-label="Kelas berikutnya" className="-right-1 hidden h-9 w-9 sm:inline-flex" />
+                  <CarouselPrevious aria-label="Program sebelumnya" className="-left-1 hidden h-9 w-9 sm:inline-flex" />
+                  <CarouselNext aria-label="Program berikutnya" className="-right-1 hidden h-9 w-9 sm:inline-flex" />
                 </>
               )}
             </Carousel>
-            {visibleClasses.length > 1 && (
+            {groupedPrograms.length > 1 && (
               <p className="mt-3 text-center text-xs text-muted-foreground">
-                Geser ke samping untuk melihat kelas lainnya <span aria-hidden="true">→</span>
+                Geser ke samping untuk melihat program lainnya <span aria-hidden="true">→</span>
               </p>
             )}
           </>
@@ -186,7 +222,7 @@ function IlmuPage() {
             <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-secondary text-primary">
               <BookOpen className="h-5 w-5" aria-hidden="true" />
             </span>
-            <p className="mt-3 font-semibold text-foreground">Belum ada kelas untuk pilihan ini</p>
+            <p className="mt-3 font-semibold text-foreground">Belum ada program untuk pilihan ini</p>
             <p className="mt-1 text-sm text-muted-foreground">
               Silakan pilih kelompok lain atau cek kembali nanti.
             </p>
@@ -194,5 +230,111 @@ function IlmuPage() {
         )}
       </section>
     </main>
+  );
+}
+
+function ProgramCard({
+  group,
+}: {
+  group: { primaryClass: any; rombels: any[]; rombelCount: number; cleanName: string };
+}) {
+  const c = group.primaryClass;
+  const rombelCount = group.rombelCount;
+  const targetGender = c.target_gender;
+  const genderLabel = targetGender === "ikhwan" ? "Ikhwan · Laki-laki" : targetGender === "akhwat" ? "Akhwat · Perempuan" : null;
+  const start = startingPrice(c);
+  const regularPrice = start?.normal ?? 0;
+  const hasPromo = !!start?.hasPromo;
+  const finalPrice = start?.final ?? 0;
+
+  return (
+    <article className="group flex h-full flex-col overflow-hidden rounded-3xl border bg-card shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5">
+      <div className="h-1.5 bg-gradient-to-r from-primary via-primary/70 to-primary/20" />
+      <div className="flex flex-1 flex-col p-5 sm:p-6">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h3 className="text-xl font-bold leading-snug text-primary sm:text-2xl">{group.cleanName}</h3>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {genderLabel && (
+              <span
+                className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                  targetGender === "akhwat"
+                    ? "bg-rose-50 text-rose-700 ring-1 ring-rose-200"
+                    : "bg-sky-50 text-sky-700 ring-1 ring-sky-200"
+                }`}
+              >
+                {genderLabel}
+              </span>
+            )}
+            {rombelCount > 1 && (
+              <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
+                {rombelCount} Pilihan Jam
+              </span>
+            )}
+          </div>
+        </div>
+
+        {c.tagline && <p className="mt-2 line-clamp-2 min-h-10 text-sm leading-relaxed text-muted-foreground">{c.tagline}</p>}
+
+        <div className="mt-4">
+          {rombelCount > 1 ? (
+            <div className="my-3 flex items-center gap-3 text-sm">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                <GraduationCap className="h-5 w-5" />
+              </span>
+              <div>
+                <p className="text-xs text-muted-foreground">Pengajar</p>
+                <p className="font-semibold text-foreground">Sesuai jam belajar yang dipilih</p>
+              </div>
+            </div>
+          ) : (
+            <TeacherIdentity teacherId={c.teacher_id} />
+          )}
+        </div>
+
+        <ul className="mt-5 space-y-3 border-t pt-4 text-sm">
+          <li className="flex items-start gap-2.5 text-foreground/90">
+            <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <span>{c.levels_label || `Level ${c.level_number || 1} · ${c.level_label || "Umum"}`}</span>
+          </li>
+          <li className="flex items-start gap-2.5 text-foreground/90">
+            <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <span>
+              {rombelCount > 1 ? (
+                <strong className="font-semibold text-primary">Tersedia {rombelCount} pilihan waktu (Kelas A, B, dst.)</strong>
+              ) : (
+                c.schedule || "Jadwal belum ditentukan"
+              )}
+            </span>
+          </li>
+          <li className="flex items-center gap-2.5 text-foreground/90">
+            <Users className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <span>
+              {rombelCount > 1 ? `Kuota ~${c.quota || 15} santri per kelas` : `Kuota ${c.quota || 15} santri`}
+            </span>
+          </li>
+        </ul>
+
+        <div className="mt-auto pt-6">
+          <p className="text-xs font-medium text-muted-foreground">Investasi belajar</p>
+          <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+            {(c.price_prefix || (start && "Mulai")) && <span className="text-sm text-muted-foreground">{c.price_prefix || "Mulai"}</span>}
+            {hasPromo ? (
+              <>
+                <span className="text-sm text-muted-foreground line-through">{rupiah(regularPrice)}</span>
+                <span className="font-display text-2xl font-bold text-foreground sm:text-3xl">{rupiah(finalPrice)}</span>
+              </>
+            ) : (
+              <span className="font-display text-2xl font-bold text-foreground sm:text-3xl">{rupiah(regularPrice)}</span>
+            )}
+            <span className="text-sm text-muted-foreground">/{start?.label ?? "paket"}</span>
+          </div>
+          <Button asChild className="mt-4 w-full rounded-xl font-semibold transition-transform group-hover:translate-y-0">
+            <Link to="/kelas/$slug" params={{ slug: c.slug }}>
+              {rombelCount > 1 ? "Pilih Jadwal & Daftar" : "Lihat detail kelas"}
+            </Link>
+          </Button>
+        </div>
+      </div>
+    </article>
   );
 }
