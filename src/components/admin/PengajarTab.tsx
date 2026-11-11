@@ -64,40 +64,105 @@ export function PengajarTab() {
       </div>
       <p className="text-sm text-muted-foreground">Pengajar masuk dengan email yang didaftarkan di sini dan mendapat Panel Guru (Sesi &amp; Nilai) untuk kelas yang dicentang.</p>
       {teachers.length === 0 && <p className="text-muted-foreground">Belum ada pengajar.</p>}
-      {teachers.map((t) => (
-        <div key={t.id} className="flex items-center justify-between gap-3 rounded-2xl border bg-card p-4">
-          <div className="min-w-0"><p className="font-semibold">{t.name}</p><p className="break-all text-sm text-muted-foreground">{t.email}</p>
-            <p className="text-xs text-muted-foreground">{t.allClasses ? "Semua kelas" : `${t.classIds?.length ?? 0} kelas`}</p></div>
-          <div className="flex shrink-0 gap-2">
-            <Button variant="outline" size="icon" aria-label={`Ubah ${t.name}`} onClick={() => { setIsNew(false); setEdit({ ...t }); }}><Pencil className="h-4 w-4" /></Button>
-            <AdminDelete name={t.name} description="Pengajar kehilangan akses Panel Guru. Kelas yang memakai pengajar ini menjadi tanpa pengajar."
-              onDelete={async () => {
-                await persist(teachers.filter((x) => x.id !== t.id));
-                const used = classes.filter((c) => c.teacher_id === t.id).map((c) => c.id);
-                if (used.length) await sb.from("classes").update({ teacher_id: null }).in("id", used);
-                if (t.photoPath) await sb.storage.from("teacher-photos").remove([t.photoPath]);
-                await qc.invalidateQueries({ queryKey: ["admin-classes"] });
-              }} />
+            {teachers.map((t) => {
+        const taught = classes.filter((c) => c.teacher_id === t.id);
+        return (
+          <div key={t.id} className="flex items-center justify-between gap-3 rounded-2xl border bg-card p-4">
+            <div className="min-w-0">
+              <p className="font-semibold">{t.name}</p>
+              <p className="break-all text-sm text-muted-foreground">{t.email}</p>
+              <p className="text-xs text-muted-foreground">
+                {t.allClasses
+                  ? "Akses: Semua kelas"
+                  : taught.length > 0
+                    ? `Mengajar: ${taught.map((c) => c.name).join(", ")}`
+                    : "Belum ditugaskan di jadwal kelas"}
+              </p>
+            </div>
+            <div className="flex shrink-0 gap-2">
+              <Button variant="outline" size="icon" aria-label={`Ubah ${t.name}`} onClick={() => { setIsNew(false); setEdit({ ...t }); }}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <AdminDelete
+                name={t.name}
+                description="Pengajar kehilangan akses Panel Guru. Kelas yang memakai pengajar ini menjadi tanpa pengajar."
+                onDelete={async () => {
+                  await persist(teachers.filter((x) => x.id !== t.id));
+                  const used = classes.filter((c) => c.teacher_id === t.id).map((c) => c.id);
+                  if (used.length) await sb.from("classes").update({ teacher_id: null }).in("id", used);
+                  if (t.photoPath) await sb.storage.from("teacher-photos").remove([t.photoPath]);
+                  await qc.invalidateQueries({ queryKey: ["admin-classes"] });
+                }}
+              />
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
+
       {edit && (
         <Dialog open onOpenChange={(o) => !o && setEdit(null)}>
           <DialogContent className="max-h-[90dvh] overflow-y-auto">
-            <DialogHeader><DialogTitle>{isNew ? "Tambah pengajar" : "Ubah pengajar"}</DialogTitle></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>{isNew ? "Tambah pengajar" : "Ubah pengajar"}</DialogTitle>
+            </DialogHeader>
             <div className="space-y-3">
-              <div className="space-y-1"><Label>Nama</Label><Input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></div>
-              <div className="space-y-1"><Label>Email akun pengajar</Label><Input type="email" value={edit.email} onChange={(e) => setEdit({ ...edit, email: e.target.value })} /></div>
-              <div className="space-y-2"><Label>Foto (opsional)</Label>
-                <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void uploadPhoto(f); }} />
-                <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}><Upload className="h-4 w-4" /> {edit.photoPath ? "Ganti foto" : "Unggah foto"}</Button>
-                {edit.photoPath && <p className="text-xs text-muted-foreground">Foto sudah terpasang.</p>}</div>
-              <div className="space-y-2 border-t pt-3"><Label>Kelas yang boleh dikelola</Label>
-                <label className="flex items-center gap-2 text-sm font-medium"><Checkbox checked={!!edit.allClasses} onCheckedChange={(v) => setEdit({ ...edit, allClasses: !!v })} />Semua kelas</label>
-                {!edit.allClasses && classes.map((c) => (
-                  <label key={c.id} className="flex items-center gap-2 text-sm"><Checkbox checked={(edit.classIds ?? []).includes(c.id)} onCheckedChange={(v) => setEdit({ ...edit, classIds: v ? [...(edit.classIds ?? []), c.id] : (edit.classIds ?? []).filter((x) => x !== c.id) })} />{c.name} · Level {c.level_number}</label>
-                ))}</div>
-              <div className="flex justify-end gap-2 pt-2"><Button variant="outline" onClick={() => setEdit(null)}>Batal</Button><Button onClick={save}>Simpan</Button></div>
+              <div className="space-y-1">
+                <Label>Nama</Label>
+                <Input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
+              </div>
+              <div className="space-y-1">
+                <Label>Email akun pengajar</Label>
+                <Input type="email" value={edit.email} onChange={(e) => setEdit({ ...edit, email: e.target.value })} />
+              </div>
+              <div className="space-y-2">
+                <Label>Foto (opsional)</Label>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (f) void uploadPhoto(f);
+                  }}
+                />
+                <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+                  <Upload className="h-4 w-4" /> {edit.photoPath ? "Ganti foto" : "Unggah foto"}
+                </Button>
+                {edit.photoPath && <p className="text-xs text-muted-foreground">Foto sudah terpasang.</p>}
+              </div>
+
+              <div className="space-y-2 border-t pt-3">
+                <Label>Akses Kelas</Label>
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Checkbox checked={!!edit.allClasses} onCheckedChange={(v) => setEdit({ ...edit, allClasses: !!v })} />
+                  Akses ke semua kelas (Kepala Pengajar)
+                </label>
+                {!edit.allClasses && (
+                  <div className="rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground space-y-1">
+                    <p className="font-semibold text-foreground">Otomatis Terhubung dari Jadwal Kelas</p>
+                    <p>
+                      Pengajar ini otomatis dapat mengelola kelas yang memilih namanya di tab <strong>Kelola Kelas</strong>.
+                    </p>
+                    {(() => {
+                      const taught = classes.filter((c) => c.teacher_id === edit.id);
+                      return taught.length > 0 ? (
+                        <p className="text-emerald-700 dark:text-emerald-400 font-medium pt-1">
+                          Saat ini mengajar ({taught.length}): {taught.map((c) => c.name).join(", ")}
+                        </p>
+                      ) : (
+                        <p className="italic pt-1">Saat ini belum ditugaskan di kelas mana pun.</p>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setEdit(null)}>Batal</Button>
+                <Button onClick={save}>Simpan</Button>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
