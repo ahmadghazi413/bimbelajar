@@ -42,12 +42,12 @@ function AdminPage() {
     return <div className="mx-auto max-w-3xl px-4 py-10"><p className="text-muted-foreground">Halaman ini hanya untuk admin dan pengajar.</p></div>;
   }
 
-  // Panel Guru: hanya Sesi & Nilai untuk kelas yang ditugaskan.
+    // Panel Guru: otomatis mengambil kelas yang ditugaskan ke guru ini
   if (!isAdmin && teacher) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-6">
         <h1 className="mb-4 text-2xl font-bold">Panel Guru</h1>
-        <SesiTab allowedClassIds={teacher.allClasses ? "all" : teacher.classIds ?? []} />
+        <SesiTab teacherId={teacher.id} allowAll={teacher.allClasses} />
       </div>
     );
   }
