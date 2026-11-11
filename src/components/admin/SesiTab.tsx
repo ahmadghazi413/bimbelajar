@@ -14,11 +14,16 @@ import { FILE_MAX_BYTES, fileExt, openPrivateFile } from "@/lib/session-content"
 import { tanggal } from "@/lib/format";
 import { sb, field, safeFileName, useClasses, useSubjects } from "./shared";
 
-export function SesiTab({ allowedClassIds }: { allowedClassIds?: string[] | "all" }) {
+export function SesiTab({ allowedClassIds, teacherId, allowAll }: { allowedClassIds?: string[] | "all"; teacherId?: string; allowAll?: boolean }) {
   const { data: allClasses = [] } = useClasses();
   const { data: subjects = [] } = useSubjects();
-  const classes = allowedClassIds && allowedClassIds !== "all" ? allClasses.filter((c) => allowedClassIds.includes(c.id)) : allClasses;
-  const subjectIds = new Set(classes.map((c) => c.subject_id));
+  const classes = allowAll || allowedClassIds === "all" 
+    ? allClasses 
+    : teacherId 
+      ? allClasses.filter((c) => c.teacher_id === teacherId || (allowedClassIds && Array.isArray(allowedClassIds) && allowedClassIds.includes(c.id)))
+      : allowedClassIds && Array.isArray(allowedClassIds)
+        ? allClasses.filter((c) => allowedClassIds.includes(c.id))
+        : allClasses;
   const visibleSubjects = subjects.filter((s) => subjectIds.has(s.id));
   const [subjectId, setSubjectId] = useState("");
   const [classId, setClassId] = useState("");
