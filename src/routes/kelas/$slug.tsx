@@ -1,81 +1,77 @@
 import { createFileRoute, notFound, Link } from "@tanstack/react-router";
-import { useSuspenseQuery, useQuery } from "@tanstack/react-query";
-import { ArrowLeft, CalendarDays, Clock3, Users, CheckCircle2 } from "lucide-react";
+import { useSuspenseQuery } from "@tanstack/react-query";
+import { ArrowLeft, CalendarDays, Clock3, Users, Check, GraduationCap } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { TeacherIdentity } from "@/components/TeacherIdentity";
 import { rupiah } from "@/lib/format";
 import { getPackagePrice, packageCounts, packageLabel, startingPrice, unitWeeks } from "@/lib/package-prices";
-import { classDetailQuery } from "@/lib/queries";
+import { classDetailQuery, settingsQuery } from "@/lib/queries";
+import { parseTeachers } from "@/lib/teachers";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/kelas/$slug")({
   loader: async ({ context, params }) => {
     const c = await context.queryClient.ensureQueryData(classDetailQuery(params.slug));
     if (!c) throw notFound();
-    return { name: c.name, tagline: c.tagline };
+
+    // Muat rombel lain dalam subject, level, dan gender yang sama
+    let siblingQuery = supabase
+      .from("classes")
+      .select("*")
+      .eq("subject_id", c.subject_id)
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true });
+
+    if (c.level_number) siblingQuery = siblingQuery.eq("level_number", c.level_number);
+    if (c.target_gender && c.target_gender !== "all") {
+      siblingQuery = siblingQuery.eq("target_gender", c.target_gender);
+    }
+
+    const [{ data: siblings }, { data: counts }, settings] = await Promise.all([
+      siblingQuery,
+      supabase.rpc("get_class_enrollment_counts"),
+      context.queryClient.ensureQueryData(settingsQuery),
+    ]);
+
+    const enrollmentMap: Record<string, number> = {};
+    for (const r of (counts as any) ?? []) enrollmentMap[r.class_id] = r.enrolled_count;
+
+    const teacherMap: Record<string, string> = {};
+    const teacherList = parseTeachers((settings as any)?.["teacher_list"]);
+    for (const t of teacherList) teacherMap[t.id] = t.name;
+
+    return {
+      c,
+      siblings: siblings && siblings.length > 0 ? siblings : [c],
+      enrollmentMap,
+      teacherMap,
+    };
   },
   head: ({ loaderData }) => ({
     meta: [
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { title: loaderData ? `${loaderData.name} — Bimbelajar` : "Kelas — Bimbelajar" },
-      { name: "description", content: loaderData?.tagline ?? "Detail kelas ngaji online." },
-      { property: "og:title", content: loaderData ? `${loaderData.name} — Bimbelajar` : "Kelas — Bimbelajar" },
-      { property: "og:description", content: loaderData?.tagline ?? "Detail kelas ngaji online." },
+      { title: loaderData ? `${loaderData.c.name} — PadatIlmu` : "Kelas — PadatIlmu" },
+      { name: "description", content: loaderData?.c.tagline ?? "Detail kelas ngaji online." },
+      { property: "og:title", content: loaderData ? `${loaderData.c.name} — PadatIlmu` : "Kelas — PadatIlmu" },
+      { property: "og:description", content: loaderData?.c.tagline ?? "Detail kelas ngaji online." },
     ],
   }),
   notFoundComponent: () => <p className="p-10 text-center">Kelas tidak ditemukan.</p>,
-  component: ClassDetailContainer,
+  component: ClassDetailPage,
 });
 
-function ClassDetailContainer() {
-  const { slug } = Route.useParams();
-  const { data: c } = useSuspenseQuery(classDetailQuery(slug));
-  if (!c) return null;
-  return <ClassDetailPage c={c} />;
-}
+function ClassDetailPage() {
+  const data = Route.useLoaderData();
+  const initialClass = data.c;
+  const rombelList = data.siblings;
+  const enrollmentMap = data.enrollmentMap;
+  const teacherMap = data.teacherMap;
 
-export function ClassDetailPage({ c }: { c: any }) {
-  // Ambil rombel / jadwal lain dalam program dan kelompok (gender) yang sama
-  const { data: siblings } = useQuery({
-    queryKey: ["sibling-classes", c.subject_id, c.level_number, c.target_gender],
-    queryFn: async () => {
-      let query = supabase
-        .from("classes")
-        .select("*")
-        .eq("subject_id", c.subject_id)
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true })
-        .order("name", { ascending: true });
-
-      if (c.level_number) {
-        query = query.eq("level_number", c.level_number);
-      }
-      if (c.target_gender && c.target_gender !== "all") {
-        query = query.eq("target_gender", c.target_gender);
-      }
-      const { data } = await query;
-      return data ?? [];
-    },
-  });
-
-  // Ambil jumlah santri terdaftar real-time untuk cek kuota rombel
-  const { data: enrollmentCounts } = useQuery({
-    queryKey: ["class-enrollment-counts"],
-    queryFn: async () => {
-      const { data } = await supabase.rpc("get_class_enrollment_counts");
-      const map: Record<string, number> = {};
-      for (const r of (data as any) ?? []) map[r.class_id] = r.enrolled_count;
-      return map;
-    },
-  });
-
-  const rombelList = (siblings && siblings.length > 0) ? siblings : [c];
-  const [selectedId, setSelectedId] = useState<string>(c.id);
-
-  // Kelas/rombel yang sedang dipilih murid
-  const activeClass = rombelList.find((item) => item.id === selectedId) ?? c;
+  const [selectedId, setSelectedId] = useState<string>(initialClass.id);
+  const activeClass = rombelList.find((item: any) => item.id === selectedId) ?? initialClass;
 
   const targetGender = activeClass.target_gender;
   const genderLabel = targetGender === "ikhwan" ? "Ikhwan · Laki-laki" : targetGender === "akhwat" ? "Akhwat · Perempuan" : null;
@@ -86,10 +82,14 @@ export function ClassDetailPage({ c }: { c: any }) {
   const allowedKinds: ("monthly" | "session")[] = (activeClass.allowed_packages?.length ? activeClass.allowed_packages : ["monthly"]);
   const priceRows = allowedKinds.flatMap((kind) => {
     const counts = packageCounts(activeClass, kind);
-    return (counts.length ? counts : [1]).map((count) => ({ key: `${kind}-${count}`, label: packageLabel(kind, count, unitWeeks(activeClass)), ...getPackagePrice(activeClass, kind, count) }));
+    return (counts.length ? counts : [1]).map((count) => ({
+      key: `${kind}-${count}`,
+      label: packageLabel(kind, count, unitWeeks(activeClass)),
+      ...getPackagePrice(activeClass, kind, count),
+    }));
   }).filter((r) => r.final > 0);
 
-  const activeEnrolled = enrollmentCounts?.[activeClass.id] ?? 0;
+  const activeEnrolled = enrollmentMap[activeClass.id] ?? 0;
   const activeQuota = activeClass.quota || 15;
   const activeRemaining = Math.max(0, activeQuota - activeEnrolled);
   const isActiveFull = activeRemaining <= 0;
@@ -113,31 +113,34 @@ export function ClassDetailPage({ c }: { c: any }) {
               </span>
             )}
           </div>
+
           <h1 className="mt-4 text-3xl font-bold tracking-tight text-primary sm:text-4xl">{activeClass.name}</h1>
           {activeClass.tagline && <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">{activeClass.tagline}</p>}
-          <div className="mt-4"><TeacherIdentity teacherId={activeClass.teacher_id} /></div>
 
-          {/* KOTAK PILIHAN JADWAL / ROMBEL */}
+          <div className="mt-4">
+            <TeacherIdentity teacherId={activeClass.teacher_id} />
+          </div>
+
+          {/* KOTAK PILIHAN JADWAL / JAM BELAJAR */}
           {rombelList.length > 1 && (
             <section className="mt-8 rounded-3xl border bg-card p-5 sm:p-6 shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h2 className="text-lg font-bold text-foreground sm:text-xl">
-                    Pilih Jadwal Belajar (Rombel)
-                  </h2>
+                  <h2 className="text-lg font-bold text-foreground sm:text-xl">Pilih Jadwal Belajar</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Tersedia {rombelList.length} pilihan jadwal. Klik waktu yang paling pas untuk Anda:
+                    Tersedia {rombelList.length} pilihan jadwal dengan pengajar masing-masing. Silakan pilih waktu yang Anda inginkan:
                   </p>
                 </div>
               </div>
 
               <div className="mt-4 space-y-3">
-                {rombelList.map((item) => {
+                {rombelList.map((item: any) => {
                   const isSelected = item.id === activeClass.id;
-                  const enrolled = enrollmentCounts?.[item.id] ?? 0;
+                  const enrolled = enrollmentMap[item.id] ?? 0;
                   const quota = item.quota || 15;
                   const remaining = Math.max(0, quota - enrolled);
                   const isFull = remaining <= 0;
+                  const teacherName = item.teacher_id ? teacherMap[item.teacher_id] : null;
 
                   return (
                     <button
@@ -151,13 +154,13 @@ export function ClassDetailPage({ c }: { c: any }) {
                           ? "border-primary bg-primary/5 ring-2 ring-primary/20 shadow-sm"
                           : isFull
                             ? "border-dashed opacity-60 bg-muted/30 cursor-not-allowed"
-                            : "hover:border-primary/40 hover:bg-secondary/20 bg-background"
+                            : "hover:border-primary/40 hover:bg-secondary/20 bg-background",
                       ].join(" ")}
                     >
                       <div className="flex items-start gap-3">
                         <span className={[
                           "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-colors",
-                          isSelected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40 bg-background"
+                          isSelected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/40 bg-background",
                         ].join(" ")}>
                           {isSelected && <span className="h-2 w-2 rounded-full bg-current" />}
                         </span>
@@ -174,6 +177,12 @@ export function ClassDetailPage({ c }: { c: any }) {
                             <CalendarDays className="h-4 w-4 shrink-0" />
                             <span>{item.schedule || "Jadwal belum ditentukan"}</span>
                           </p>
+                          {teacherName && (
+                            <p className="mt-0.5 text-xs text-muted-foreground flex items-center gap-1.5">
+                              <GraduationCap className="h-3.5 w-3.5 shrink-0" />
+                              <span>Pengajar: <strong className="text-foreground font-medium">{teacherName}</strong></span>
+                            </p>
+                          )}
                         </div>
                       </div>
 
