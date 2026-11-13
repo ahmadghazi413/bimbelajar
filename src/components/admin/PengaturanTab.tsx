@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { settingsQuery } from "@/lib/queries";
 import { sb, field, safeFileName } from "./shared";
+import { WaOutboxPanel } from "./WaOutboxPanel";
 
 const KEYS = ["site_name", "admin_whatsapp", "bank_name", "bank_number", "bank_holder", "payment_mode", "logo_url", "qris_image_url", "apk_url", "apk_name"] as const;
 type Form = Record<(typeof KEYS)[number], string>;
@@ -94,6 +95,7 @@ export function PengaturanTab() {
         {pick(apkRef, ".apk,application/vnd.android.package-archive", (f) => void uploadPublic(f, "apk", "apk_url", "apk_name"), "Unggah file APK")}
       </section>
       <Button onClick={() => save()} disabled={busy}>Simpan pengaturan</Button>
+            <WaOutboxPanel />
     </div>
   );
 }
