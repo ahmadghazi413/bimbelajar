@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Copy, Pencil } from "lucide-react";
+import { ChevronDown, Copy, Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,8 +13,9 @@ import { AdminDelete } from "@/components/AdminDelete";
 import { classType, CLASS_TYPE_LABEL } from "@/lib/class-type";
 import { rupiah } from "@/lib/format";
 import { buildPackagePrices, getPackagePrice, monthlyChoices, packageCounts, packageLabel, parsePackagePrices, SESSION_CHOICES, startingPrice, unitWeeks, type PricePair } from "@/lib/package-prices";
-import { DAYS, formatSchedule, parseSchedule, type Day, type ScheduleSlot } from "@/lib/schedule";
+import { DAYS, formatSchedule, slotsForSave, slotsOf, type Day, type ScheduleSlot } from "@/lib/schedule";
 import { settingsQuery } from "@/lib/queries";
+import { groupClasses, nextRombelName, splitRombelName, type ClassGroup } from "@/lib/class-groups";
 import { parseTeachers } from "@/lib/teachers";
 import { sb, field, slugify, useClasses, useSubjects } from "./shared";
 
@@ -57,6 +58,57 @@ function initialPrices(c: any): PriceTable {
 
 function toggle<T>(list: T[], v: T) { return list.includes(v) ? list.filter((x) => x !== v) : [...list, v].sort() as T[]; }
 
+/** Validasi paket dan harga, lalu hasilkan kolom `classes` yang berkaitan dengan harga. */
+function computePricing(e: any): { error: string } | { cols: Record<string, any> } {
+  const pkgs: string[] = e.allowed_packages?.length ? e.allowed_packages : ["monthly"];
+  const hasMonthly = pkgs.includes("monthly");
+  const hasSession = pkgs.includes("session");
+  const months: number[] = hasMonthly ? [...(e.available_months ?? [])].sort((a: number, b: number) => a - b) : [];
+  const sessions: number[] = hasSession ? [...(e.available_sessions ?? [])].sort((a: number, b: number) => a - b) : [];
+  if (hasMonthly && !months.length) return { error: "Pilih minimal satu lama paket." };
+  if (hasSession && !sessions.length) return { error: "Pilih minimal satu jumlah sesi." };
+  const prices = e.prices as PriceTable;
+  for (const [kind, counts] of [["monthly", months], ["session", sessions]] as const) {
+    for (const n of counts) {
+      const row = prices[kind][String(n)];
+      const normal = Number(row?.normal || 0);
+      const promo = Number(row?.promo || 0);
+      const lbl = packageLabel(kind, n, unitWeeks(e));
+      if (!(normal > 0)) return { error: `Isi harga normal paket ${lbl}.` };
+      if (promo > 0 && promo >= normal) return { error: `Harga promo paket ${lbl} harus lebih kecil dari harga normal.` };
+    }
+  }
+  const table = buildPackagePrices(prices as any, months, sessions);
+  const unit = (kind: "monthly" | "session", counts: number[]) => {
+    const n0 = counts[0];
+    if (!n0) return { normal: 0, promo: 0 };
+    const p = table[kind]![String(n0)]!;
+    return { normal: Math.round(p.normal / n0), promo: p.promo > 0 ? Math.round(p.promo / n0) : 0 };
+  };
+  const uM = unit("monthly", months);
+  const uS = unit("session", sessions);
+  const sessionOnly = hasSession && !hasMonthly;
+  const effMonthly = uM.promo > 0 ? uM.promo : uM.normal;
+  const effSession = uS.promo > 0 ? uS.promo : uS.normal;
+  return {
+    cols: {
+      package_prices: table,
+      price_normal: uM.normal,
+      price_promo: uM.promo,
+      price: sessionOnly ? effSession : effMonthly,
+      allowed_packages: pkgs,
+      available_sessions: sessions,
+      available_months: months,
+      price_per_session: effSession,
+      price_per_session_normal: uS.normal,
+      price_per_session_promo: uS.promo,
+      package_type: sessionOnly ? "session" : "monthly",
+      package_weeks: Number(e.package_weeks || 4),
+      package_sessions: sessionOnly ? 1 : Number(sessions[0] ?? 4),
+    },
+  };
+}
+
 export function KelasTab() {
   const { data: classes = [] } = useClasses();
   const { data: subjects = [] } = useSubjects();
@@ -74,6 +126,15 @@ export function KelasTab() {
     return genderFilter === "umum" ? g === "all" : g === genderFilter;
   });
   const selectedSubject = subjects.find((s) => s.id === subjectId);
+  const groups = groupClasses(visibleClasses);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const { data: counts = {} } = useQuery({
+    queryKey: ["admin-class-counts"],
+    queryFn: async () => {
+      const { data } = await sb.rpc("get_class_enrollment_counts");
+      return Object.fromEntries(((data as any[]) ?? []).map((r) => [r.class_id, Number(r.enrolled_count) || 0])) as Record<string, number>;
+    },
+  });
 
   async function refresh() {
     await qc.invalidateQueries({ queryKey: ["admin-classes"] });
@@ -84,6 +145,7 @@ export function KelasTab() {
   async function open(c: any | null) {
     if (!c) {
       return setEdit({
+        mode: "new",
         is_active: true, allowed_packages: ["monthly"], package_weeks: 4,
         available_months: [1], available_sessions: [],
         prices: { monthly: { "1": { normal: "", promo: "" } }, session: {} } as PriceTable,
@@ -93,21 +155,24 @@ export function KelasTab() {
       });
     }
     const { data } = await sb.from("class_private").select("*").eq("class_id", c.id).maybeSingle();
-    const slots = parseSchedule(c.schedule);
+    const slots = slotsOf(c);
     setEdit({
+      mode: "rombel",
       ...c, whatsapp_link: data?.whatsapp_link ?? "", zoom_link: data?.zoom_link ?? "",
       available_months: (() => { const ok = packageCounts(c, "monthly").filter((m) => monthlyChoices(unitWeeks(c)).includes(m)); return ok.length ? ok : [1]; })(), available_sessions: packageCounts(c, "session"),
       prices: initialPrices(c), slots, legacySchedule: slots.length ? "" : (c.schedule ?? ""),
     });
   }
-  async function duplicate(c: any) {
+  /** Rombel baru: salinan `c` dengan nama berikutnya di program yang sama (Kelas A → B → C). */
+  async function addRombel(c: any, group: ClassGroup) {
     const { data } = await sb.from("class_private").select("*").eq("class_id", c.id).maybeSingle();
-    const slots = parseSchedule(c.schedule);
+    const slots = slotsOf(c);
     setEdit({
+      mode: "rombel",
       ...c,
       id: undefined, // Kosongkan id agar disimpan sebagai kelas baru
       slug: "",      // Kosongkan slug agar sistem membuat URL baru
-      name: `${c.name} (Rombel Baru)`,
+      name: nextRombelName(group),
       sort_order: classes.length + 1,
       whatsapp_link: data?.whatsapp_link ?? "",
       zoom_link: data?.zoom_link ?? "",
@@ -117,45 +182,72 @@ export function KelasTab() {
       slots,
       legacySchedule: slots.length ? "" : (c.schedule ?? ""),
     });
+    toast.info("Rombel baru siap. Atur jadwal dan pengajarnya, lalu klik Simpan.");
+  }
+
+  /** Kolom yang dipakai bersama oleh semua rombel dalam satu program. */
+  const SHARED_KEYS = ["subject_id", "name", "tagline", "description", "goals", "advantages", "level", "target_gender", "price_prefix"] as const;
+  const sharedSnapshot = (e: any) => ({
+    subject_id: e.subject_id ?? "", name: e.name ?? "", tagline: e.tagline ?? "", description: e.description ?? "", goals: e.goals ?? "",
+    advantages: e.advantages ?? "", level: `${e.level_number}|${e.level_label}`, target_gender: e.target_gender ?? "all", price_prefix: e.price_prefix ?? "",
+  });
+
+  async function openProgram(group: ClassGroup) {
+    const first = group.rombels[0]!;
+    const base = {
+      ...first,
+      name: group.cleanName,
+      available_months: (() => { const ok = packageCounts(first, "monthly").filter((m) => monthlyChoices(unitWeeks(first)).includes(m)); return ok.length ? ok : [1]; })(),
+      available_sessions: packageCounts(first, "session"),
+      prices: initialPrices(first),
+    };
+    setEdit({ ...base, mode: "program", group, applyPricing: false, initial: sharedSnapshot(base) });
+  }
+
+  /** Simpan perubahan program ke semua rombel. Hanya kolom yang benar-benar diubah yang ditimpa. */
+  async function saveProgram() {
+    const { group, initial } = edit;
+    if (!String(edit.name ?? "").trim()) return toast.error("Nama program wajib diisi.");
+    if (!edit.subject_id) return toast.error("Pilih ilmu.");
+    const now = sharedSnapshot(edit);
+    const changed = (k: (typeof SHARED_KEYS)[number]) => now[k] !== initial[k];
+    let pricing: Record<string, any> | null = null;
+    if (edit.applyPricing) {
+      const pr = computePricing(edit);
+      if ("error" in pr) return toast.error(pr.error);
+      pricing = pr.cols;
+    }
+    try {
+      for (const r of group.rombels as any[]) {
+        const update: Record<string, any> = {};
+        if (changed("name")) {
+          const { label } = splitRombelName(r.name);
+          update.name = label ? `${now.name.trim()} Kelas ${label}` : now.name.trim();
+        }
+        for (const k of ["subject_id", "tagline", "description", "goals", "advantages", "price_prefix", "target_gender"] as const) if (changed(k)) update[k] = now[k];
+        if (changed("level")) {
+          const [n, l] = now.level.split("|");
+          update.level_number = Number(n); update.level_label = l; update.levels_label = `Level ${n} · ${l}`;
+        }
+        if (pricing) Object.assign(update, pricing);
+        if (Object.keys(update).length === 0) continue;
+        const { error } = await sb.from("classes").update(update).eq("id", r.id);
+        if (error) throw new Error(error.message.includes("duplicate") ? "Nama program bentrok dengan kelas lain. Ganti sedikit namanya." : error.message);
+      }
+      await refresh();
+      setEdit(null);
+      toast.success(`Program diperbarui untuk ${group.rombels.length} rombel.`);
+    } catch (e: any) {
+      toast.error(e.message ?? "Gagal menyimpan program.");
+    }
   }
 
   async function save() {
+    if (edit?.mode === "program") return saveProgram();
     if (!edit?.name?.trim() || !edit.subject_id) return toast.error("Nama kelas dan ilmu wajib diisi.");
-    const pkgs: string[] = edit.allowed_packages?.length ? edit.allowed_packages : ["monthly"];
-    const hasMonthly = pkgs.includes("monthly");
-    const hasSession = pkgs.includes("session");
-    const months: number[] = hasMonthly ? [...(edit.available_months ?? [])].sort((a: number, b: number) => a - b) : [];
-    const sessions: number[] = hasSession ? [...(edit.available_sessions ?? [])].sort((a: number, b: number) => a - b) : [];
-    if (hasMonthly && !months.length) return toast.error("Pilih minimal satu lama paket.");
-    if (hasSession && !sessions.length) return toast.error("Pilih minimal satu jumlah sesi.");
-    const prices = edit.prices as PriceTable;
-    const check = (kind: "monthly" | "session", counts: number[]) => {
-      for (const n of counts) {
-        const row = prices[kind][String(n)];
-        const normal = Number(row?.normal || 0);
-        const promo = Number(row?.promo || 0);
-        if (!(normal > 0)) return `Isi harga normal paket ${packageLabel(kind, n, unitWeeks(edit))}.`;
-        if (promo > 0 && promo >= normal) return `Harga promo paket ${packageLabel(kind, n, unitWeeks(edit))} harus lebih kecil dari harga normal.`;
-      }
-      return null;
-    };
-    const problem = check("monthly", months) ?? check("session", sessions);
-    if (problem) return toast.error(problem);
+    const pr = computePricing(edit);
+    if ("error" in pr) return toast.error(pr.error);
     if (edit.slots?.some((x: ScheduleSlot) => x.end <= x.start)) return toast.error("Jam selesai harus setelah jam mulai.");
-    const table = buildPackagePrices(prices as any, months, sessions);
-    const unit = (kind: "monthly" | "session", counts: number[]) => {
-      const n0 = counts[0];
-      if (!n0) return { normal: 0, promo: 0 };
-      const p = table[kind]![String(n0)]!;
-      return { normal: Math.round(p.normal / n0), promo: p.promo > 0 ? Math.round(p.promo / n0) : 0 };
-    };
-    const uM = unit("monthly", months);
-    const uS = unit("session", sessions);
-    const normalM = uM.normal, promoM = uM.promo, normalS = uS.normal, promoS = uS.promo;
-
-    const sessionOnly = hasSession && !hasMonthly;
-    const effMonthly = promoM > 0 ? promoM : normalM;
-    const effSession = promoS > 0 ? promoS : normalS;
     const lvl = Number(edit.level_number ?? 1);
     const label = edit.level_label ?? "Pemula";
     const payload = {
@@ -166,29 +258,19 @@ export function KelasTab() {
       goals: edit.goals ?? "",
       advantages: edit.advantages ?? "",
       schedule: edit.slots?.length ? formatSchedule(edit.slots) : (edit.legacySchedule ?? ""),
-      package_prices: table,
       quota: Number(edit.quota ?? 15),
       target_gender: edit.target_gender || "all",
-      price_normal: normalM,
-      price_promo: promoM,
-      price: sessionOnly ? effSession : effMonthly,
       price_prefix: edit.price_prefix ?? "",
       is_active: edit.is_active ?? true,
-      allowed_packages: pkgs,
-      available_sessions: sessions,
-      available_months: months,
-      price_per_session: effSession,
-      price_per_session_normal: normalS,
-      price_per_session_promo: promoS,
-      package_type: sessionOnly ? "session" : "monthly",
-      package_weeks: Number(edit.package_weeks || 4),
-      package_sessions: sessionOnly ? 1 : Number(sessions[0] ?? 4),
       sort_order: Number(edit.sort_order ?? 99),
       subject_id: edit.subject_id,
       level_number: lvl,
       level_label: label,
       levels_label: `Level ${lvl} · ${label}`,
-      teacher_id: edit.teacher_id || null,
+      schedule_slots: slotsForSave(edit.slots ?? []),
+      // Pengajar utama = pengajar hari pertama; tanpa jadwal, memakai pilihan tunggal.
+      teacher_id: (edit.slots?.length ? [...edit.slots].sort((a: ScheduleSlot, b: ScheduleSlot) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day)).find((x: ScheduleSlot) => x.teacherId)?.teacherId : edit.teacher_id) || null,
+      ...pr.cols,
     };
     const res = edit.id
       ? await sb.from("classes").update(payload).eq("id", edit.id).select("id").single()
@@ -211,6 +293,10 @@ export function KelasTab() {
     <div className="space-y-1"><Label>{label}</Label><Input type="number" min={0} value={edit?.[k] ?? ""} onChange={(e) => set(k, e.target.value === "" ? "" : Number(e.target.value))} /></div>
   );
   const pk: string[] = edit?.allowed_packages ?? ["monthly"];
+  const mode: "new" | "rombel" | "program" = edit?.mode ?? "new";
+  const showShared = mode !== "rombel";
+  const showRombel = mode !== "program";
+  const showPricing = mode !== "program" || !!edit?.applyPricing;
   const setPrice = (kind: "monthly" | "session", count: number, f: "normal" | "promo", v: number | "") =>
     setEdit((e: any) => ({ ...e, prices: { ...e.prices, [kind]: { ...e.prices[kind], [String(count)]: { ...(e.prices[kind][String(count)] ?? { normal: "", promo: "" }), [f]: v } } } }));
   const toggleCount = (kind: "monthly" | "session", count: number) =>
@@ -224,8 +310,11 @@ export function KelasTab() {
   const setSlots = (slots: ScheduleSlot[]) => setEdit((e: any) => ({ ...e, slots, schedule: formatSchedule(slots) }));
   const toggleDay = (day: Day) => {
     const slots: ScheduleSlot[] = edit?.slots ?? [];
-    setSlots(slots.some((x) => x.day === day) ? slots.filter((x) => x.day !== day) : [...slots, { day, start: "19:30", end: "21:00" }]);
+    const defaultTeacher = slots.find((x) => x.teacherId)?.teacherId ?? (edit?.teacher_id || undefined);
+    setSlots(slots.some((x) => x.day === day) ? slots.filter((x) => x.day !== day) : [...slots, { day, start: "19:30", end: "21:00", teacherId: defaultTeacher }]);
   };
+  const setSlotTeacher = (day: Day, teacherId: string) =>
+    setSlots((edit?.slots ?? []).map((x: ScheduleSlot) => (x.day === day ? { ...x, teacherId: teacherId || undefined } : x)));
   const setSlotTime = (day: Day, f: "start" | "end", v: string) =>
     setSlots((edit?.slots ?? []).map((x: ScheduleSlot) => (x.day === day ? { ...x, [f]: v } : x)));
   const weeks = unitWeeks(edit);
@@ -286,48 +375,136 @@ export function KelasTab() {
       {subjectId && visibleClasses.length === 0 && (
         <p className="text-muted-foreground">Belum ada kelas {genderFilter === "all" ? "" : `${GENDER_FILTERS.find((g) => g.v === genderFilter)?.l} `}di {selectedSubject?.name}.</p>
       )}
-      {visibleClasses.map((c) => {
-        const start = startingPrice(c);
+      {subjectId && groups.length > 0 && (
+        <p className="text-sm text-muted-foreground">{groups.length} program · {visibleClasses.length} kelas/rombel</p>
+      )}
+      {groups.map((g) => {
+        const first = g.rombels[0]!;
+        const prices = g.rombels.map((r) => startingPrice(r)).filter(Boolean) as NonNullable<ReturnType<typeof startingPrice>>[];
+        const low = prices.length ? prices.reduce((a, b) => (b.final < a.final ? b : a)) : null;
+        const expanded = openGroups[g.key] ?? g.rombels.length <= 3;
+        const gender = first.target_gender || "all";
+        const activeCount = g.rombels.filter((r) => r.is_active).length;
         return (
-          <div key={c.id} className="flex items-center justify-between gap-3 rounded-2xl border bg-card p-4">
-            <div className="min-w-0">
-              <p className="font-semibold">{c.name} {!c.is_active && <span className="text-xs text-muted-foreground">(nonaktif)</span>}</p>
-              <p className="text-sm text-muted-foreground">{GENDER_LABEL[c.target_gender || "all"]} · Level {c.level_number} {c.level_label} · {CLASS_TYPE_LABEL[classType(c)]}</p>
-              {c.schedule && <p className="text-sm text-muted-foreground">{c.schedule}</p>}
-              {start && (
-                <p className="text-sm">
-                  <span className="mr-1 text-muted-foreground">Mulai</span>
-                  {start.hasPromo && <span className="mr-2 text-muted-foreground line-through">{rupiah(start.normal)}</span>}
-                  {rupiah(start.final)} <span className="text-muted-foreground">/ {start.label}</span>
-                </p>
+          <section key={g.key} className="overflow-hidden rounded-3xl border bg-card shadow-sm">
+            <div className="h-1.5 bg-gradient-to-r from-primary via-primary/70 to-primary/20" />
+            <div className="space-y-3 p-4 sm:p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="text-lg font-bold leading-snug text-primary">{g.cleanName}</h3>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs font-semibold">
+                    <span className="rounded-full bg-secondary px-2.5 py-1 text-secondary-foreground">Level {first.level_number} · {first.level_label}</span>
+                    <span className={`rounded-full px-2.5 py-1 ${gender === "akhwat" ? "bg-rose-50 text-rose-700 ring-1 ring-rose-200" : gender === "ikhwan" ? "bg-sky-50 text-sky-700 ring-1 ring-sky-200" : "bg-secondary text-secondary-foreground"}`}>{GENDER_LABEL[gender]}</span>
+                    <span className="rounded-full bg-primary/10 px-2.5 py-1 text-primary">{g.rombels.length} rombel{activeCount < g.rombels.length ? ` · ${activeCount} aktif` : ""}</span>
+                  </div>
+                  {low && (
+                    <p className="mt-2 text-sm">
+                      <span className="mr-1 text-muted-foreground">Mulai</span>
+                      {low.hasPromo && <span className="mr-2 text-muted-foreground line-through">{rupiah(low.normal)}</span>}
+                      <span className="font-semibold">{rupiah(low.final)}</span> <span className="text-muted-foreground">/ {low.label}</span>
+                      {prices.some((p) => p.final !== low.final) && <span className="ml-2 text-xs text-muted-foreground">(harga tiap rombel bisa berbeda)</span>}
+                    </p>
+                  )}
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <Button variant="outline" size="sm" className="rounded-xl" onClick={() => openProgram(g)}><Pencil className="mr-1.5 h-4 w-4" />Ubah program</Button>
+                  <Button size="sm" className="rounded-xl" onClick={() => addRombel(g.rombels[g.rombels.length - 1]!, g)}><Plus className="mr-1.5 h-4 w-4" />Tambah rombel</Button>
+                </div>
+              </div>
+
+              {g.rombels.length > 3 && (
+                <button type="button" className="flex items-center gap-1 text-sm font-medium text-primary" aria-expanded={expanded} onClick={() => setOpenGroups((o) => ({ ...o, [g.key]: !expanded }))}>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
+                  {expanded ? "Sembunyikan rombel" : `Tampilkan ${g.rombels.length} rombel`}
+                </button>
+              )}
+
+              {expanded && (
+                <ul className="divide-y rounded-2xl border bg-background/60">
+                  {g.rombels.map((c) => {
+                    const start = startingPrice(c);
+                    const { label } = splitRombelName(c.name);
+                    const filled = counts[c.id] ?? 0;
+                    return (
+                      <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 p-3">
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="font-semibold">
+                            {label ? `Kelas ${label}` : c.name}
+                            {!c.is_active && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">nonaktif</span>}
+                          </p>
+                          {slotsOf(c).length > 0 ? (
+                            <ul className="text-sm text-muted-foreground">
+                              {slotsOf(c).map((sl) => (
+                                <li key={sl.day}>{sl.day} {sl.start}–{sl.end} WIB · <span className="text-foreground">{teachers.find((t) => t.id === sl.teacherId)?.name ?? "belum ada pengajar"}</span></li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">{c.schedule || "Jadwal belum ditentukan"}</p>
+                          )}
+                          <p className="text-sm text-muted-foreground">
+                            {CLASS_TYPE_LABEL[classType(c)]} · {filled}/{c.quota || 15} terisi
+                            {start && <> · <span className="text-foreground">{rupiah(start.final)}</span> / {start.label}</>}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 gap-2">
+                          <Button variant="outline" size="icon" aria-label={`Duplikat ${c.name}`} title="Duplikat sebagai rombel baru" onClick={() => addRombel(c, g)}><Copy className="h-4 w-4" /></Button>
+                          <Button variant="outline" size="icon" aria-label={`Ubah ${c.name}`} onClick={() => open(c)}><Pencil className="h-4 w-4" /></Button>
+                          <AdminDelete name={c.name} description="Kelas kosong beserta sesi dan rekamannya dihapus permanen. Kelas yang sudah punya pendaftar tidak bisa dihapus, nonaktifkan saja."
+                            onDelete={async () => { const { error } = await sb.from("classes").delete().eq("id", c.id); if (error) throw new Error(error.message); await refresh(); }} />
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
             </div>
-            <div className="flex shrink-0 gap-2">
-              <Button variant="outline" size="icon" aria-label={`Duplikat ${c.name}`} title="Duplikat kelas (rombel baru)" onClick={() => duplicate(c)}>
-                <Copy className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon" aria-label={`Ubah ${c.name}`} onClick={() => open(c)}><Pencil className="h-4 w-4" /></Button>
-              <AdminDelete name={c.name} description="Kelas kosong beserta sesi dan rekamannya dihapus permanen. Kelas yang sudah punya pendaftar tidak bisa dihapus, nonaktifkan saja."
-                onDelete={async () => { const { error } = await sb.from("classes").delete().eq("id", c.id); if (error) throw new Error(error.message); await refresh(); }} />
-            </div>
-          </div>
+          </section>
         );
       })}
 
       {edit && (
         <Dialog open onOpenChange={(o) => !o && setEdit(null)}>
           <DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto">
-            <DialogHeader><DialogTitle>{edit.id ? "Ubah kelas" : "Tambah kelas"}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{edit.mode === "program" ? "Ubah program" : edit.mode === "rombel" ? (edit.id ? "Ubah rombel" : "Rombel baru") : "Tambah kelas"}</DialogTitle></DialogHeader>
             <div className="space-y-3">
-              <div className="space-y-1"><Label>Ilmu</Label>
-                <select className={field} value={edit.subject_id ?? ""} onChange={(e) => set("subject_id", e.target.value)}>
-                  <option value="">Pilih ilmu</option>{subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select></div>
-              {txt("name", "Nama kelas")}
-              {txt("tagline", "Tagline")}
-              {txt("description", "Deskripsi", true)}
-              {txt("goals", "Tujuan", true)}
-              {txt("advantages", "Keunggulan (satu per baris)", true)}
+              {mode === "program" && (
+                <p className="rounded-xl bg-primary/10 p-3 text-sm text-primary">
+                  <strong>Berlaku untuk {edit.group.rombels.length} rombel.</strong> Jadwal, pengajar, kuota, dan link diatur per rombel lewat tombol edit di barisnya.
+                </p>
+              )}
+              {mode === "rombel" && (
+                <p className="rounded-xl bg-secondary/60 p-3 text-sm text-muted-foreground">
+                  Program: <strong className="text-foreground">{splitRombelName(edit.name).base}</strong> · Level {edit.level_number} {edit.level_label} · {GENDER_LABEL[edit.target_gender || "all"]}.
+                  {" "}Nama program, deskripsi, level, dan kelompok diubah lewat <strong>Ubah program</strong>.
+                </p>
+              )}
+
+              {showShared && (
+                <div className="space-y-1"><Label>Ilmu</Label>
+                  <select className={field} value={edit.subject_id ?? ""} onChange={(e) => set("subject_id", e.target.value)}>
+                    <option value="">Pilih ilmu</option>{subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select></div>
+              )}
+              {txt("name", mode === "program" ? "Nama program (huruf rombel dipertahankan otomatis)" : mode === "rombel" ? "Nama rombel (mis. Tahsin Kelas A)" : "Nama kelas")}
+              {showShared && (<>
+                {txt("tagline", "Tagline")}
+                {txt("description", "Deskripsi", true)}
+                {txt("goals", "Tujuan", true)}
+                {txt("advantages", "Keunggulan (satu per baris)", true)}
+                <div className="space-y-1"><Label>Level</Label>
+                  <select className={field} value={`${edit.level_number}|${edit.level_label}`}
+                    onChange={(e) => { const [n, l] = e.target.value.split("|"); setEdit((x: any) => ({ ...x, level_number: Number(n), level_label: l })); }}>
+                    {!levelKnown && <option value={`${edit.level_number}|${edit.level_label}`}>Level {edit.level_number} {edit.level_label} (lama)</option>}
+                    {LEVELS.map((l) => <option key={l.n} value={`${l.n}|${l.l}`}>Level {l.n} · {l.l}</option>)}
+                  </select></div>
+                <div className="space-y-1"><Label>Untuk</Label>
+                  <select className={field} value={edit.target_gender ?? "all"} onChange={(e) => set("target_gender", e.target.value)}>
+                    <option value="all">Umum</option><option value="ikhwan">Ikhwan</option><option value="akhwat">Akhwat</option>
+                  </select></div>
+                {txt("price_prefix", "Awalan harga (mis. Mulai)")}
+              </>)}
+
+              {showRombel && (<>
               <div className="space-y-2">
                 <Label>Jadwal (pilih hari dan jam)</Label>
                 <div className="flex flex-wrap gap-2" role="group" aria-label="Pilih hari">
@@ -345,10 +522,18 @@ export function KelasTab() {
                   <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-800">Jadwal lama: “{edit.legacySchedule}”. Pilih hari di atas untuk menggantinya; kalau dibiarkan, jadwal lama tetap dipakai.</p>
                 )}
                 {[...(edit.slots ?? [])].sort((a: ScheduleSlot, b: ScheduleSlot) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day)).map((x: ScheduleSlot) => (
-                  <div key={x.day} className="grid grid-cols-[5rem_1fr_1fr] items-center gap-2 rounded-xl bg-secondary/40 p-2.5">
-                    <span className="text-sm font-semibold">{x.day}</span>
-                    <div className="flex items-center gap-1.5"><span className="text-xs text-muted-foreground">Mulai</span><Input type="time" value={x.start} onChange={(e) => setSlotTime(x.day, "start", e.target.value)} /></div>
-                    <div className="flex items-center gap-1.5"><span className="text-xs text-muted-foreground">Selesai</span><Input type="time" value={x.end} onChange={(e) => setSlotTime(x.day, "end", e.target.value)} /></div>
+                  <div key={x.day} className="space-y-2 rounded-xl bg-secondary/40 p-2.5">
+                    <div className="grid grid-cols-[5rem_1fr_1fr] items-center gap-2">
+                      <span className="text-sm font-semibold">{x.day}</span>
+                      <div className="flex items-center gap-1.5"><span className="text-xs text-muted-foreground">Mulai</span><Input type="time" value={x.start} onChange={(e) => setSlotTime(x.day, "start", e.target.value)} /></div>
+                      <div className="flex items-center gap-1.5"><span className="text-xs text-muted-foreground">Selesai</span><Input type="time" value={x.end} onChange={(e) => setSlotTime(x.day, "end", e.target.value)} /></div>
+                    </div>
+                    <div className="grid grid-cols-[5rem_1fr] items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Pengajar</span>
+                      <select className={field} aria-label={`Pengajar hari ${x.day}`} value={x.teacherId ?? ""} onChange={(e) => setSlotTeacher(x.day, e.target.value)}>
+                        <option value="">Belum dipilih</option>{teachers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                      </select>
+                    </div>
                   </div>
                 ))}
                 {(edit.slots ?? []).length > 0 && <p className="text-xs text-muted-foreground">Tampil di website: {formatSchedule(edit.slots)}</p>}
@@ -356,26 +541,26 @@ export function KelasTab() {
               <div className="grid gap-3 sm:grid-cols-2">
                 {num("quota", "Kuota")}{num("sort_order", "Urutan")}
               </div>
-              <div className="space-y-1"><Label>Level</Label>
-                <select className={field} value={`${edit.level_number}|${edit.level_label}`}
-                  onChange={(e) => { const [n, l] = e.target.value.split("|"); setEdit((x: any) => ({ ...x, level_number: Number(n), level_label: l })); }}>
-                  {!levelKnown && <option value={`${edit.level_number}|${edit.level_label}`}>Level {edit.level_number} {edit.level_label} (lama)</option>}
-                  {LEVELS.map((l) => <option key={l.n} value={`${l.n}|${l.l}`}>Level {l.n} · {l.l}</option>)}
-                </select></div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1"><Label>Untuk</Label>
-                  <select className={field} value={edit.target_gender ?? "all"} onChange={(e) => set("target_gender", e.target.value)}>
-                    <option value="all">Umum</option><option value="ikhwan">Ikhwan</option><option value="akhwat">Akhwat</option>
-                  </select></div>
-                <div className="space-y-1"><Label>Pengajar</Label>
+              {(edit.slots ?? []).length === 0 && (
+                <div className="space-y-1"><Label>Pengajar (pilih hari dulu untuk mengatur pengajar per hari)</Label>
                   <select className={field} value={edit.teacher_id ?? ""} onChange={(e) => set("teacher_id", e.target.value)}>
                     <option value="">Belum dipilih</option>{teachers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select></div>
-              </div>
-              {txt("price_prefix", "Awalan harga (mis. Mulai)")}
+              )}
               {txt("whatsapp_link", "Link grup WhatsApp (untuk murid lunas)")}
               {txt("zoom_link", "Link Zoom kelas (cadangan bila sesi belum punya link sendiri)")}
+              </>)}
 
+              {mode === "program" && (
+                <div className="flex items-start justify-between gap-3 rounded-xl border p-3">
+                  <div>
+                    <Label>Samakan paket dan harga di semua rombel</Label>
+                    <p className="text-xs text-muted-foreground">Mati: harga tiap rombel dibiarkan seperti sekarang. Hidup: paket dan harga di bawah menimpa semua rombel.</p>
+                  </div>
+                  <Switch checked={!!edit.applyPricing} onCheckedChange={(v) => set("applyPricing", v)} />
+                </div>
+              )}
+              {showPricing && (<>
               <div className="space-y-2 border-t pt-3">
                 <Label className="font-medium">Paket yang dijual</Label>
                 <div className="flex flex-wrap gap-4">
@@ -414,8 +599,12 @@ export function KelasTab() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between border-t pt-3"><Label>Kelas aktif (tampil di website)</Label><Switch checked={edit.is_active ?? true} onCheckedChange={(v) => set("is_active", v)} /></div>
-              <div className="flex justify-end gap-2 pt-2"><Button variant="outline" onClick={() => setEdit(null)}>Batal</Button><Button onClick={save}>Simpan</Button></div>
+              </>)}
+
+              {showRombel && (
+                <div className="flex items-center justify-between border-t pt-3"><Label>Kelas aktif (tampil di website)</Label><Switch checked={edit.is_active ?? true} onCheckedChange={(v) => set("is_active", v)} /></div>
+              )}
+              <div className="flex justify-end gap-2 pt-2"><Button variant="outline" onClick={() => setEdit(null)}>Batal</Button><Button onClick={save}>{mode === "program" ? "Simpan untuk semua rombel" : "Simpan"}</Button></div>
             </div>
           </DialogContent>
         </Dialog>
