@@ -12,6 +12,7 @@ import { AdminDelete } from "@/components/AdminDelete";
 import { classLevelName, classesInSubject } from "@/lib/class-management";
 import { FILE_MAX_BYTES, fileExt, openPrivateFile } from "@/lib/session-content";
 import { tanggal } from "@/lib/format";
+import { classHasTeacher } from "@/lib/schedule";
 import { sb, field, safeFileName, useClasses, useSubjects } from "./shared";
 
 export function SesiTab({ allowedClassIds, teacherId, allowAll }: { allowedClassIds?: string[] | "all"; teacherId?: string; allowAll?: boolean }) {
@@ -20,7 +21,7 @@ export function SesiTab({ allowedClassIds, teacherId, allowAll }: { allowedClass
   const classes = allowAll || allowedClassIds === "all" 
     ? allClasses 
     : teacherId 
-      ? allClasses.filter((c) => c.teacher_id === teacherId || (allowedClassIds && Array.isArray(allowedClassIds) && allowedClassIds.includes(c.id)))
+      ? allClasses.filter((c) => classHasTeacher(c, teacherId) || (allowedClassIds && Array.isArray(allowedClassIds) && allowedClassIds.includes(c.id)))
       : allowedClassIds && Array.isArray(allowedClassIds)
         ? allClasses.filter((c) => allowedClassIds.includes(c.id))
         : allClasses;
