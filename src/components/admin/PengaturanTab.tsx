@@ -91,8 +91,8 @@ export function PengaturanTab() {
       <section className="space-y-3 rounded-2xl border bg-card p-4">
         <h3 className="font-semibold">Pembayaran</h3>
         <div className="space-y-1"><Label>Metode pembayaran</Label>
-          <select className={field} value={form.payment_mode || "ipaymu"} onChange={(e) => set("payment_mode", e.target.value)}>
-            <option value="ipaymu">iPaymu (otomatis) + transfer bank / QRIS</option><option value="manual">Hanya transfer bank / QRIS</option>
+          <select className={field} value={form.payment_mode || "manual"} onChange={(e) => set("payment_mode", e.target.value)}>
+            <option value="manual">Transfer bank / QRIS saja</option><option value="both">Tambah iPaymu (otomatis) + transfer bank / QRIS</option><option value="ipaymu">iPaymu saja</option>
           </select></div>
         <div className="space-y-2"><Label>Rekening bank</Label>
           <p className="text-xs text-muted-foreground">Murid bisa memilih transfer bank atau QRIS, dan menyalin nomor rekening. Boleh lebih dari satu rekening.</p>
