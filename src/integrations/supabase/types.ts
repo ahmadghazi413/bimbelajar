@@ -108,6 +108,7 @@ export type Database = {
           default_session_count: number
           target_gender: string
           teacher_id: string | null
+          schedule_slots: Json
           subject_id: string | null
           sort_order: number
           is_active: boolean
@@ -143,6 +144,7 @@ export type Database = {
           default_session_count?: number
           target_gender?: string
           teacher_id?: string | null
+          schedule_slots?: Json
           subject_id?: string | null
           sort_order?: number
           is_active?: boolean
@@ -178,6 +180,7 @@ export type Database = {
           default_session_count?: number
           target_gender?: string
           teacher_id?: string | null
+          schedule_slots?: Json
           subject_id?: string | null
           sort_order?: number
           is_active?: boolean
