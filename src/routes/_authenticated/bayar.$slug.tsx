@@ -447,4 +447,308 @@ function Bayar() {
                             {rupiah(pr.final)}
                           </span>
                         );
-     
+                      })()}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Belum ada pilihan sesi untuk kelas ini.</p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Paket {effSessions} Sesi: <b>{rupiah(basePrice)}</b>
+              </p>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between rounded-2xl bg-secondary/50 p-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Paket yang dipilih</p>
+              <p className="font-semibold text-sm">
+                {effType === "monthly"
+                  ? `Paket Berlangganan (${packageLabel("monthly", effMonths, unitWeeks(c))})`
+                  : `Paket ${effSessions} Sesi Pertemuan`}
+              </p>
+            </div>
+            <p className="font-display text-lg font-bold text-primary">{rupiah(basePrice)}</p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="v">Kode teman / voucher (opsional)</Label>
+            <div className="flex gap-2">
+              <Input
+                id="v"
+                value={voucher}
+                onChange={(ev) => {
+                  setVoucher(ev.target.value);
+                  setApplied(null);
+                }}
+                className="h-12"
+                placeholder="Contoh: AJAKTEMAN"
+              />
+              <Button
+                variant="outline"
+                className="h-12"
+                disabled={busy || !voucher.trim()}
+                onClick={terapkanVoucher}
+              >
+                Terapkan
+              </Button>
+            </div>
+            {applied && (
+              <p className="text-sm text-success font-medium">
+                {applied.kind === "referral" ? "Kode teman" : "Voucher"} diterapkan · Diskon{" "}
+                {rupiah(quote.data?.discount ?? 0)}
+              </p>
+            )}
+          </div>
+
+          {(balance.data ?? 0) > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <Label htmlFor="use-reward">Gunakan saldo bonus ({rupiah(balance.data ?? 0)})</Label>
+                <Switch id="use-reward" checked={useReward} onCheckedChange={setUseReward} />
+              </div>
+              {useReward && (
+                <p className="text-sm text-success">
+                  Potongan bonus: {rupiah(quote.data?.reward_used ?? 0)}
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="rounded-2xl border-2 border-primary/20 bg-primary/5 p-4 flex items-center justify-between">
+            <span className="font-semibold text-sm">Total yang Harus Dibayar</span>
+            <span className="font-display text-xl font-extrabold text-primary">{rupiah(finalPrice)}</span>
+          </div>
+
+          {canIpaymu && canManual && (
+            <div className="space-y-3 pt-2">
+              <Label className="font-semibold text-sm">Pilih Cara Pembayaran:</Label>
+              <div className="grid gap-2">
+                {([
+                  { id: "ipaymu", icon: <Zap className="h-4 w-4 text-amber-500 fill-amber-500" />, title: "Otomatis (iPaymu)", desc: "QRIS, e-wallet, atau VA Bank. Langsung lunas & aktif.", on: effMethod === "ipaymu" },
+                  { id: "bank", icon: <Landmark className="h-4 w-4" />, title: "Transfer Bank", desc: "Transfer ke rekening admin, lalu kirim bukti.", on: effMethod === "manual" && payTab === "bank" },
+                  { id: "qris", icon: <QrCode className="h-4 w-4" />, title: "QRIS", desc: "Scan QRIS admin, lalu kirim bukti.", on: effMethod === "manual" && payTab === "qris" },
+                ] as const).map((o) => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    onClick={() => {
+                      if (o.id === "ipaymu") setPaymentMethod("ipaymu");
+                      else {
+                        setPaymentMethod("manual");
+                        setPayTab(o.id);
+                      }
+                    }}
+                    className={`flex flex-col items-start rounded-2xl border p-3.5 text-left transition ${
+                      o.on ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20" : "border-border hover:bg-secondary"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-bold text-sm">{o.icon}{o.title}</div>
+                    <div className="mt-1 text-[11px] text-muted-foreground">{o.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {effMethod === "ipaymu" ? (
+            <div className="space-y-3 rounded-2xl bg-secondary/30 p-4 border">
+              <div className="flex items-start gap-3">
+                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
+                  <CreditCard className="h-4 w-4" />
+                </div>
+                <div className="text-xs text-muted-foreground leading-relaxed">
+                  Setelah menekan tombol di bawah, Anda akan diarahkan ke halaman resmi <strong>iPaymu</strong> untuk memilih metode bayar (Scan QRIS GoPay/ShopeePay/DANA/OVO atau Virtual Account Bank).
+                </div>
+              </div>
+
+              <Button
+                variant="hero"
+                size="lg"
+                className="w-full text-base font-bold shadow-md"
+                disabled={busy || quote.isFetching || (!!voucher.trim() && !applied)}
+                onClick={bayarIpaymu}
+              >
+                {busy ? "Menyiapkan Pembayaran..." : `Bayar Sekarang ${rupiah(finalPrice)} (iPaymu)`}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4 pt-1">
+              <TransferInfo amount={finalPrice} qris={qris ?? ""} banks={banks} tab={payTab} onTab={setPayTab} hideTabs={canIpaymu && canManual} />
+
+              <div className="space-y-2">
+                <Label htmlFor="s">Nama pemilik rekening pengirim</Label>
+                <Input
+                  id="s"
+                  value={sender}
+                  onChange={(ev) => setSender(ev.target.value)}
+                  className="h-12"
+                  placeholder="Contoh: Siti Aminah"
+                />
+              </div>
+
+              <ProofUpload busy={busy} hasProof={!!stagedProof} onPick={uploadProof} />
+              {stagedProof && <p className="text-sm text-muted-foreground">File dipilih: {stagedProof.name}</p>}
+
+              <Button
+                variant="hero"
+                size="lg"
+                className="w-full"
+                disabled={
+                  !canConfirmPayment(stagedProof?.name, busy) ||
+                  !sender.trim() ||
+                  quote.isFetching ||
+                  !!quote.error ||
+                  !quote.data ||
+                  (!!voucher.trim() && !applied)
+                }
+                onClick={daftarManual}
+              >
+                {busy ? "Memproses..." : "Saya sudah bayar"}
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {wa && (
+        <Button asChild variant="success" size="lg" className="mt-4 w-full">
+          <a href={wa} target="_blank" rel="noreferrer">
+            <MessageCircle /> Butuh bantuan? Chat Admin
+          </a>
+        </Button>
+      )}
+
+      {c.advantages?.trim() && (
+        <>
+          <h2 className="mb-4 mt-8 text-2xl font-semibold">Keunggulan</h2>
+          <p className="whitespace-pre-line leading-relaxed">{c.advantages}</p>
+        </>
+      )}
+    </Page>
+  );
+}
+
+function CopyButton({ text, label }: { text: string; label: string }) {
+  const [done, setDone] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setDone(true);
+      toast.success(`${label} disalin`);
+      setTimeout(() => setDone(false), 1500);
+    } catch {
+      toast.error("Gagal menyalin. Tekan lama pada angka untuk menyalin manual.");
+    }
+  }
+  return (
+    <Button type="button" variant="outline" size="sm" onClick={() => void copy()}>
+      {done ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {done ? "Tersalin" : "Salin"}
+    </Button>
+  );
+}
+
+function TransferInfo({
+  amount,
+  qris,
+  banks,
+  tab,
+  onTab,
+  hideTabs = false,
+}: {
+  amount: number;
+  qris: string;
+  banks: BankAccount[];
+  tab: "bank" | "qris";
+  onTab: (t: "bank" | "qris") => void;
+  hideTabs?: boolean;
+}) {
+  const tabCls = (on: boolean) =>
+    `flex items-center justify-center gap-2 rounded-2xl border p-3 text-sm font-bold transition ${
+      on ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20" : "border-border hover:bg-secondary"
+    }`;
+  return (
+    <div className="space-y-3">
+      {!hideTabs && (
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={() => onTab("bank")} className={tabCls(tab === "bank")}>
+          <Landmark className="h-4 w-4" /> Transfer Bank
+        </button>
+        <button type="button" onClick={() => onTab("qris")} className={tabCls(tab === "qris")}>
+          <QrCode className="h-4 w-4" /> QRIS
+        </button>
+      </div>
+      )}
+
+      {tab === "bank" ? (
+        banks.length === 0 ? (
+          <p className="rounded-2xl border p-4 text-sm text-muted-foreground">Rekening belum diatur admin. Hubungi admin lewat WhatsApp.</p>
+        ) : (
+          banks.map((b, i) => (
+            <div key={`${b.bank}-${b.number}-${i}`} className="rounded-2xl bg-secondary p-4 text-secondary-foreground">
+              <p className="font-semibold">{b.bank}</p>
+              <div className="mt-1 flex items-center justify-between gap-3">
+                <p className="font-display text-2xl tracking-wider break-all">{b.number}</p>
+                <CopyButton text={b.number} label="Nomor rekening" />
+              </div>
+              {b.holder && <p className="text-sm">a.n. {b.holder}</p>}
+            </div>
+          ))
+        )
+      ) : (
+        <div className="rounded-2xl border p-4">
+          {qris ? (
+            <img src={qris} alt="Kode QRIS Bimbelajar" className="mx-auto w-full max-w-xs rounded-xl" />
+          ) : (
+            <p className="text-sm text-muted-foreground">Gambar QRIS akan segera ditambahkan admin.</p>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-3 rounded-2xl border-2 border-primary/20 bg-primary/5 p-4">
+        <div>
+          <p className="text-xs text-muted-foreground">Jumlah yang dibayar</p>
+          <p className="font-display text-xl font-extrabold text-primary">{rupiah(amount)}</p>
+        </div>
+        <CopyButton text={String(Math.round(amount))} label="Jumlah" />
+      </div>
+    </div>
+  );
+}
+
+function ProofUpload({
+  busy,
+  hasProof,
+  onPick,
+}: {
+  busy: boolean;
+  hasProof: boolean;
+  onPick: (f: File) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed p-4">
+      <Label htmlFor="proof" className="flex cursor-pointer flex-col items-center gap-2 py-2 text-center">
+        <Upload className="h-6 w-6 text-primary" />
+        <span className="font-semibold">
+          {busy ? "Memproses..." : hasProof ? "Ganti bukti pembayaran" : "Unggah bukti pembayaran"}
+        </span>
+        <span className="text-xs text-muted-foreground">
+          Foto/screenshot bukti transfer atau QRIS (maks 5 MB)
+        </span>
+      </Label>
+      <input
+        id="proof"
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        disabled={busy}
+        onChange={(ev) => {
+          const f = ev.target.files?.[0];
+          if (f) onPick(f);
+          ev.target.value = "";
+        }}
+      />
+    </div>
+  );
+}
