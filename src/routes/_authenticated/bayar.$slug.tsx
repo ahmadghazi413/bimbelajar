@@ -68,8 +68,8 @@ function Bayar() {
     },
   });
 
-  const [paymentMethod, setPaymentMethod] = useState<"ipaymu" | "manual">("manual");
-  const [payTab, setPayTab] = useState<"bank" | "qris">("bank");
+  // Awalnya semua pilihan tertutup; terbuka hanya setelah murid menekannya.
+  const [picked, setPicked] = useState<PayChoice | null>(null);
   const [packageType, setPackageType] = useState<"monthly" | "session">("monthly");
   const [selectedSessions, setSelectedSessions] = useState<number>(8);
   const [selectedMonths, setSelectedMonths] = useState<number>(1);
@@ -123,8 +123,7 @@ function Bayar() {
   const payMode: "ipaymu" | "both" | "manual" = pm === "ipaymu" || pm === "both" ? pm : "manual";
   const canIpaymu = payMode !== "manual";
   const canManual = payMode !== "ipaymu";
-  const effMethod: "ipaymu" | "manual" =
-    paymentMethod === "ipaymu" && canIpaymu ? "ipaymu" : paymentMethod === "manual" && canManual ? "manual" : canIpaymu ? "ipaymu" : "manual";
+  const effPick: PayChoice | null = !canManual ? "ipaymu" : picked === "ipaymu" && !canIpaymu ? null : picked;
   const e = enr.data;
   const endDate = e?.status === "paid" ? packageEnd(e as any) : null;
   const sessionTopUp = e?.status === "paid" && (e as any).package_type === "session" && bought > 0 && remaining > 0;
@@ -227,7 +226,7 @@ function Bayar() {
             user_id: userId,
             class_id: c.id,
             amount: finalPrice,
-            method: payTab === "qris" ? "QRIS" : "Transfer Bank",
+            method: effPick === "qris" ? "QRIS" : "Transfer Bank",
             sender_name: sender.trim(),
             package_type: effType,
             sessions_total: effType === "session" ? effSessions : null,
@@ -311,7 +310,7 @@ function Bayar() {
             </>
           ) : (
             <>
-              <PayAccordion canIpaymu={false} selected={payTab} onSelect={(id) => id !== "ipaymu" && setPayTab(id)} banks={banks} qris={qris ?? ""} />
+              <PayAccordion canIpaymu={false} selected={picked === "ipaymu" ? null : picked} onSelect={setPicked} banks={banks} qris={qris ?? ""} />
               <AmountCard amount={e.amount} />
               <ProofUpload busy={busy} hasProof={!!stagedProof || !!e.proof_url} onPick={uploadProof} />
               {stagedProof && <p className="text-sm text-muted-foreground">File dipilih: {stagedProof.name}</p>}
@@ -525,20 +524,14 @@ function Bayar() {
           {canManual && (
           <PayAccordion
             canIpaymu={canIpaymu}
-            selected={effMethod === "ipaymu" ? "ipaymu" : payTab}
-            onSelect={(id) => {
-              if (id === "ipaymu") setPaymentMethod("ipaymu");
-              else {
-                setPaymentMethod("manual");
-                setPayTab(id);
-              }
-            }}
+            selected={effPick}
+            onSelect={setPicked}
             banks={banks}
             qris={qris ?? ""}
           />
           )}
 
-          {effMethod === "ipaymu" ? (
+          {effPick === "ipaymu" ? (
             <div className="space-y-3 rounded-2xl bg-secondary/30 p-4 border">
               <div className="flex items-start gap-3">
                 <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
@@ -559,7 +552,7 @@ function Bayar() {
                 {busy ? "Menyiapkan Pembayaran..." : `Bayar Sekarang ${rupiah(finalPrice)} (iPaymu)`}
               </Button>
             </div>
-          ) : (
+          ) : effPick ? (
             <div className="space-y-4 pt-1">
               <AmountCard amount={finalPrice} />
 
@@ -594,7 +587,7 @@ function Bayar() {
                 {busy ? "Memproses..." : "Saya sudah bayar"}
               </Button>
             </div>
-          )}
+          ) : null}
         </div>
       )}
 
@@ -645,8 +638,8 @@ function PayAccordion({
   qris,
 }: {
   canIpaymu: boolean;
-  selected: PayChoice;
-  onSelect: (id: PayChoice) => void;
+  selected: PayChoice | null;
+  onSelect: (id: PayChoice | null) => void;
   banks: BankAccount[];
   qris: string;
 }) {
@@ -666,7 +659,7 @@ function PayAccordion({
             <button
               type="button"
               aria-expanded={open}
-              onClick={() => onSelect(it.id)}
+              onClick={() => onSelect(open ? null : it.id)}
               className={`flex w-full items-center gap-3 p-3.5 text-left ${open ? "bg-primary/10" : "hover:bg-secondary"}`}
             >
               <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-secondary">
