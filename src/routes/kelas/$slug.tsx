@@ -25,9 +25,8 @@ export const Route = createFileRoute("/kelas/$slug")({
       .order("name", { ascending: true });
 
     if (c.level_number) siblingQuery = siblingQuery.eq("level_number", c.level_number);
-    if (c.target_gender && c.target_gender !== "all") {
-      siblingQuery = siblingQuery.eq("target_gender", c.target_gender);
-    }
+    const targetGender = c.target_gender || "all";
+siblingQuery = siblingQuery.eq("target_gender", targetGender);
 
     const [{ data: siblings }, { data: counts }, settings] = await Promise.all([
       siblingQuery,
