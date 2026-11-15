@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AdminDelete } from "@/components/AdminDelete";
 import { settingsQuery } from "@/lib/queries";
 import { parseTeachers, type Teacher } from "@/lib/teachers";
+import { classHasTeacher, removeTeacherUpdate } from "@/lib/schedule";
 import { sb, safeFileName, useClasses } from "./shared";
 
 const MAX_PHOTO = 3 * 1024 * 1024;
@@ -65,7 +66,7 @@ export function PengajarTab() {
       <p className="text-sm text-muted-foreground">Pengajar masuk dengan email yang didaftarkan di sini dan mendapat Panel Guru (Sesi &amp; Nilai) untuk kelas yang dicentang.</p>
       {teachers.length === 0 && <p className="text-muted-foreground">Belum ada pengajar.</p>}
             {teachers.map((t) => {
-        const taught = classes.filter((c) => c.teacher_id === t.id);
+        const taught = classes.filter((c) => classHasTeacher(c, t.id));
         return (
           <div key={t.id} className="flex items-center justify-between gap-3 rounded-2xl border bg-card p-4">
             <div className="min-w-0">
@@ -88,8 +89,10 @@ export function PengajarTab() {
                 description="Pengajar kehilangan akses Panel Guru. Kelas yang memakai pengajar ini menjadi tanpa pengajar."
                 onDelete={async () => {
                   await persist(teachers.filter((x) => x.id !== t.id));
-                  const used = classes.filter((c) => c.teacher_id === t.id).map((c) => c.id);
-                  if (used.length) await sb.from("classes").update({ teacher_id: null }).in("id", used);
+                  for (const c of classes) {
+                    const update = removeTeacherUpdate(c, t.id);
+                    if (update) await sb.from("classes").update(update).eq("id", c.id);
+                  }
                   if (t.photoPath) await sb.storage.from("teacher-photos").remove([t.photoPath]);
                   await qc.invalidateQueries({ queryKey: ["admin-classes"] });
                 }}
@@ -146,7 +149,7 @@ export function PengajarTab() {
                       Pengajar ini otomatis dapat mengelola kelas yang memilih namanya di tab <strong>Kelola Kelas</strong>.
                     </p>
                     {(() => {
-                      const taught = classes.filter((c) => c.teacher_id === edit.id);
+                      const taught = classes.filter((c) => classHasTeacher(c, edit.id));
                       return taught.length > 0 ? (
                         <p className="text-emerald-700 dark:text-emerald-400 font-medium pt-1">
                           Saat ini mengajar ({taught.length}): {taught.map((c) => c.name).join(", ")}
