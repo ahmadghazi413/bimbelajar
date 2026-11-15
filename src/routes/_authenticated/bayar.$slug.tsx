@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Landmark, MessageCircle, QrCode, Upload, Zap, CreditCard, Copy, Check } from "lucide-react";
+import { Landmark, MessageCircle, QrCode, Upload, Zap, CreditCard, Copy, Check, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { classDetailQuery, settingsQuery } from "@/lib/queries";
 import { rupiah } from "@/lib/format";
@@ -68,7 +68,7 @@ function Bayar() {
     },
   });
 
-  const [paymentMethod, setPaymentMethod] = useState<"ipaymu" | "manual">("ipaymu");
+  const [paymentMethod, setPaymentMethod] = useState<"ipaymu" | "manual">("manual");
   const [payTab, setPayTab] = useState<"bank" | "qris">("bank");
   const [packageType, setPackageType] = useState<"monthly" | "session">("monthly");
   const [selectedSessions, setSelectedSessions] = useState<number>(8);
@@ -118,9 +118,9 @@ function Bayar() {
   const monthOptions = packageCounts(c, "monthly").filter((m) => m <= 12);
   const effMonths = monthOptions.includes(selectedMonths) ? selectedMonths : (monthOptions[0] ?? 1);
 
-  const payMode = settings?.["payment_mode"] === "ipaymu" || settings?.["payment_mode"] === "manual"
-    ? (settings["payment_mode"] as "ipaymu" | "manual")
-    : "both";
+  // iPaymu hanya muncul kalau admin mengaktifkannya ("both" atau "ipaymu"); bawaannya hanya transfer bank / QRIS.
+  const pm = settings?.["payment_mode"];
+  const payMode: "ipaymu" | "both" | "manual" = pm === "ipaymu" || pm === "both" ? pm : "manual";
   const canIpaymu = payMode !== "manual";
   const canManual = payMode !== "ipaymu";
   const effMethod: "ipaymu" | "manual" =
@@ -311,7 +311,8 @@ function Bayar() {
             </>
           ) : (
             <>
-              <TransferInfo amount={e.amount} qris={qris ?? ""} banks={banks} tab={payTab} onTab={setPayTab} />
+              <PayAccordion canIpaymu={false} selected={payTab} onSelect={(id) => id !== "ipaymu" && setPayTab(id)} banks={banks} qris={qris ?? ""} />
+              <AmountCard amount={e.amount} />
               <ProofUpload busy={busy} hasProof={!!stagedProof || !!e.proof_url} onPick={uploadProof} />
               {stagedProof && <p className="text-sm text-muted-foreground">File dipilih: {stagedProof.name}</p>}
               {(!e.proof_url || stagedProof) && (
@@ -521,35 +522,20 @@ function Bayar() {
             <span className="font-display text-xl font-extrabold text-primary">{rupiah(finalPrice)}</span>
           </div>
 
-          {canIpaymu && canManual && (
-            <div className="space-y-3 pt-2">
-              <Label className="font-semibold text-sm">Pilih Cara Pembayaran:</Label>
-              <div className="grid gap-2">
-                {([
-                  { id: "ipaymu", icon: <Zap className="h-4 w-4 text-amber-500 fill-amber-500" />, title: "Otomatis (iPaymu)", desc: "QRIS, e-wallet, atau VA Bank. Langsung lunas & aktif.", on: effMethod === "ipaymu" },
-                  { id: "bank", icon: <Landmark className="h-4 w-4" />, title: "Transfer Bank", desc: "Transfer ke rekening admin, lalu kirim bukti.", on: effMethod === "manual" && payTab === "bank" },
-                  { id: "qris", icon: <QrCode className="h-4 w-4" />, title: "QRIS", desc: "Scan QRIS admin, lalu kirim bukti.", on: effMethod === "manual" && payTab === "qris" },
-                ] as const).map((o) => (
-                  <button
-                    key={o.id}
-                    type="button"
-                    onClick={() => {
-                      if (o.id === "ipaymu") setPaymentMethod("ipaymu");
-                      else {
-                        setPaymentMethod("manual");
-                        setPayTab(o.id);
-                      }
-                    }}
-                    className={`flex flex-col items-start rounded-2xl border p-3.5 text-left transition ${
-                      o.on ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20" : "border-border hover:bg-secondary"
-                    }`}
-                  >
-                    <div className="flex items-center gap-1.5 font-bold text-sm">{o.icon}{o.title}</div>
-                    <div className="mt-1 text-[11px] text-muted-foreground">{o.desc}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
+          {canManual && (
+          <PayAccordion
+            canIpaymu={canIpaymu}
+            selected={effMethod === "ipaymu" ? "ipaymu" : payTab}
+            onSelect={(id) => {
+              if (id === "ipaymu") setPaymentMethod("ipaymu");
+              else {
+                setPaymentMethod("manual");
+                setPayTab(id);
+              }
+            }}
+            banks={banks}
+            qris={qris ?? ""}
+          />
           )}
 
           {effMethod === "ipaymu" ? (
@@ -575,7 +561,7 @@ function Bayar() {
             </div>
           ) : (
             <div className="space-y-4 pt-1">
-              <TransferInfo amount={finalPrice} qris={qris ?? ""} banks={banks} tab={payTab} onTab={setPayTab} hideTabs={canIpaymu && canManual} />
+              <AmountCard amount={finalPrice} />
 
               <div className="space-y-2">
                 <Label htmlFor="s">Nama pemilik rekening pengirim</Label>
@@ -630,7 +616,7 @@ function Bayar() {
   );
 }
 
-function CopyButton({ text, label }: { text: string; label: string }) {
+function CopyButton({ text, label, className }: { text: string; label: string; className?: string }) {
   const [done, setDone] = useState(false);
   async function copy() {
     try {
@@ -643,76 +629,94 @@ function CopyButton({ text, label }: { text: string; label: string }) {
     }
   }
   return (
-    <Button type="button" variant="outline" size="sm" onClick={() => void copy()}>
+    <Button type="button" variant="outline" size="sm" className={className} onClick={() => void copy()}>
       {done ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />} {done ? "Tersalin" : "Salin"}
     </Button>
   );
 }
 
-function TransferInfo({
-  amount,
-  qris,
+type PayChoice = "ipaymu" | "bank" | "qris";
+
+function PayAccordion({
+  canIpaymu,
+  selected,
+  onSelect,
   banks,
-  tab,
-  onTab,
-  hideTabs = false,
+  qris,
 }: {
-  amount: number;
-  qris: string;
+  canIpaymu: boolean;
+  selected: PayChoice;
+  onSelect: (id: PayChoice) => void;
   banks: BankAccount[];
-  tab: "bank" | "qris";
-  onTab: (t: "bank" | "qris") => void;
-  hideTabs?: boolean;
+  qris: string;
 }) {
-  const tabCls = (on: boolean) =>
-    `flex items-center justify-center gap-2 rounded-2xl border p-3 text-sm font-bold transition ${
-      on ? "border-primary bg-primary/10 text-primary ring-2 ring-primary/20" : "border-border hover:bg-secondary"
-    }`;
+  const items: { id: PayChoice; title: string; desc: string }[] = [
+    ...(canIpaymu ? [{ id: "ipaymu" as const, title: "Otomatis (iPaymu)", desc: "Langsung lunas dan aktif" }] : []),
+    { id: "bank", title: "Transfer Bank", desc: banks.length > 1 ? `${banks.length} rekening tersedia` : "Transfer ke rekening admin, lalu kirim bukti" },
+    { id: "qris", title: "QRIS", desc: "Scan dari bank atau e-wallet apa saja" },
+  ];
   return (
-    <div className="space-y-3">
-      {!hideTabs && (
-      <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={() => onTab("bank")} className={tabCls(tab === "bank")}>
-          <Landmark className="h-4 w-4" /> Transfer Bank
-        </button>
-        <button type="button" onClick={() => onTab("qris")} className={tabCls(tab === "qris")}>
-          <QrCode className="h-4 w-4" /> QRIS
-        </button>
-      </div>
-      )}
-
-      {tab === "bank" ? (
-        banks.length === 0 ? (
-          <p className="rounded-2xl border p-4 text-sm text-muted-foreground">Rekening belum diatur admin. Hubungi admin lewat WhatsApp.</p>
-        ) : (
-          banks.map((b, i) => (
-            <div key={`${b.bank}-${b.number}-${i}`} className="rounded-2xl bg-secondary p-4 text-secondary-foreground">
-              <p className="font-semibold">{b.bank}</p>
-              <div className="mt-1 flex items-center justify-between gap-3">
-                <p className="font-display text-2xl tracking-wider break-all">{b.number}</p>
-                <CopyButton text={b.number} label="Nomor rekening" />
+    <div className="space-y-2 pt-2">
+      <Label className="font-semibold text-sm">Pilih Cara Pembayaran:</Label>
+      {items.map((it) => {
+        const open = selected === it.id;
+        const Icon = it.id === "ipaymu" ? Zap : it.id === "bank" ? Landmark : QrCode;
+        return (
+          <div key={it.id} className={`overflow-hidden rounded-2xl border transition ${open ? "border-primary" : "border-border"}`}>
+            <button
+              type="button"
+              aria-expanded={open}
+              onClick={() => onSelect(it.id)}
+              className={`flex w-full items-center gap-3 p-3.5 text-left ${open ? "bg-primary/10" : "hover:bg-secondary"}`}
+            >
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-secondary">
+                <Icon className="h-5 w-5" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-bold">{it.title}</span>
+                <span className="block text-[11px] text-muted-foreground">{it.desc}</span>
+              </span>
+              <ChevronDown className={`h-5 w-5 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+            </button>
+            {it.id !== "ipaymu" && (
+              <div className={`grid transition-[grid-template-rows] duration-300 ${open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                <div className="overflow-hidden">
+                  <div className="space-y-2 px-3 pb-3 pt-1">
+                    {it.id === "bank" ? (
+                      banks.length === 0 ? (
+                        <p className="rounded-xl bg-secondary p-3 text-sm text-muted-foreground">Rekening belum diatur admin. Hubungi admin lewat WhatsApp.</p>
+                      ) : (
+                        banks.map((b, i) => (
+                          <div key={`${b.number}-${i}`} className="rounded-xl bg-secondary p-3 text-secondary-foreground">
+                            <p className="text-sm font-semibold">{b.bank}</p>
+                            <p className="font-display text-2xl tracking-wider break-all">{b.number}</p>
+                            {b.holder && <p className="text-sm">a.n. {b.holder}</p>}
+                            <CopyButton text={b.number} label="Nomor rekening" className="mt-2 w-full" />
+                          </div>
+                        ))
+                      )
+                    ) : qris ? (
+                      <img src={qris} alt="Kode QRIS Bimbelajar" className="mx-auto w-full max-w-xs rounded-xl" />
+                    ) : (
+                      <p className="rounded-xl bg-secondary p-3 text-sm text-muted-foreground">Gambar QRIS akan segera ditambahkan admin.</p>
+                    )}
+                  </div>
+                </div>
               </div>
-              {b.holder && <p className="text-sm">a.n. {b.holder}</p>}
-            </div>
-          ))
-        )
-      ) : (
-        <div className="rounded-2xl border p-4">
-          {qris ? (
-            <img src={qris} alt="Kode QRIS Bimbelajar" className="mx-auto w-full max-w-xs rounded-xl" />
-          ) : (
-            <p className="text-sm text-muted-foreground">Gambar QRIS akan segera ditambahkan admin.</p>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
-      <div className="flex items-center justify-between gap-3 rounded-2xl border-2 border-primary/20 bg-primary/5 p-4">
-        <div>
-          <p className="text-xs text-muted-foreground">Jumlah yang dibayar</p>
-          <p className="font-display text-xl font-extrabold text-primary">{rupiah(amount)}</p>
-        </div>
-        <CopyButton text={String(Math.round(amount))} label="Jumlah" />
-      </div>
+function AmountCard({ amount }: { amount: number }) {
+  return (
+    <div className="rounded-2xl border-2 border-primary/20 bg-primary/5 p-4">
+      <p className="text-xs text-muted-foreground">Jumlah yang dibayar</p>
+      <p className="font-display text-2xl font-extrabold text-primary">{rupiah(amount)}</p>
+      <CopyButton text={String(Math.round(amount))} label="Jumlah" className="mt-2 w-full" />
     </div>
   );
 }
