@@ -1,9 +1,10 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, Check, GraduationCap, Users, UsersRound } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowLeft, BookOpen, CalendarDays, ChevronDown, Users } from "lucide-react";
+import { useState } from "react";
 import { subjectClassesQuery } from "@/lib/queries";
-import { TeacherIdentity } from "@/components/TeacherIdentity";
+import { groupClasses, type ClassGroup } from "@/lib/class-groups";
+import { CATEGORY_OPTIONS, categoryLabel, classCategory, scheduleLines, type ClassCategory } from "@/lib/class-category";
 import { Button } from "@/components/ui/button";
 import { rupiah } from "@/lib/format";
 import { startingPrice } from "@/lib/package-prices";
@@ -14,21 +15,6 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-
-const genderOptions = [
-  { value: "all", label: "Semua kelas", description: "Ikhwan dan akhwat", icon: UsersRound },
-  { value: "ikhwan", label: "Ikhwan", description: "Laki-laki", icon: UsersRound },
-  { value: "akhwat", label: "Akhwat", description: "Perempuan", icon: UsersRound },
-] as const;
-
-type GenderFilter = (typeof genderOptions)[number]["value"];
-type ClassWithGender = { target_gender?: string | null };
-
-function matchesTargetGender(classItem: ClassWithGender, filter: GenderFilter) {
-  const gender = classItem.target_gender ?? "all";
-  if (filter === "all") return true;
-  return gender === filter || gender === "all";
-}
 
 export const Route = createFileRoute("/ilmu/$slug")({
   loader: async ({ context, params }) => {
@@ -53,47 +39,14 @@ export const Route = createFileRoute("/ilmu/$slug")({
 function IlmuPage() {
   const { slug } = Route.useParams();
   const { data } = useSuspenseQuery(subjectClassesQuery(slug));
-  const [selectedGender, setSelectedGender] = useState<GenderFilter>("all");
+  const [openCat, setOpenCat] = useState<ClassCategory | null>(null);
 
   if (!data.subject) return null;
 
   const classes = data.classes.filter((c) => c.is_active !== false);
   const isTahsinPage = slug === "tahsin";
-  const visibleClasses = isTahsinPage
-    ? classes.filter((c) => matchesTargetGender(c as typeof c & ClassWithGender, selectedGender))
-    : classes;
-  const selectedOption = genderOptions.find((option) => option.value === selectedGender) ?? genderOptions[0];
-
-  // Menggabungkan kelas rombel (Kelas A, B, C) dengan level & gender sama jadi 1 kartu program
-  const groupedPrograms = useMemo(() => {
-    const groups: Record<string, any[]> = {};
-
-    for (const c of visibleClasses) {
-      const key = c.level_number
-        ? `lvl-${c.level_number}-${c.target_gender ?? "all"}`
-        : `cls-${c.name.replace(/[\s\-_]+Kelas\s+[A-Za-z0-9]+$/i, "").trim()}-${c.target_gender ?? "all"}`;
-
-      if (!groups[key]) {
-        groups[key] = [];
-      }
-      groups[key].push(c);
-    }
-
-    return Object.values(groups).map((rombels) => {
-      rombels.sort((a, b) => (a.sort_order ?? 99) - (b.sort_order ?? 99) || a.name.localeCompare(b.name));
-      const primary = rombels[0];
-      const cleanName = primary.name
-        .replace(/[\s\-_]+Kelas\s+[A-Za-z0-9]+$/i, "")
-        .trim();
-
-      return {
-        primaryClass: primary,
-        rombels,
-        rombelCount: rombels.length,
-        cleanName: cleanName || primary.name,
-      };
-    });
-  }, [visibleClasses]);
+  // Kelas rombel (Kelas A, B, C) dengan level & gender sama digabung jadi 1 kartu program.
+  const groups = groupClasses(classes);
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 sm:py-10">
@@ -115,208 +68,134 @@ function IlmuPage() {
         )}
       </header>
 
-      {isTahsinPage && (
-        <section className="mt-8 rounded-3xl border bg-gradient-to-br from-card to-secondary/50 p-4 shadow-sm sm:mt-10 sm:p-6">
-          <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-              <UsersRound className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <div>
-              <h2 className="text-lg font-bold text-foreground sm:text-xl">Pilih kelas sesuai kelompok</h2>
-              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                Tampilkan kelas Ikhwan (laki-laki) atau Akhwat (perempuan).
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3" role="group" aria-label="Pilih kelompok santri">
-            {genderOptions.map((option) => {
-              const isActive = selectedGender === option.value;
-              const Icon = option.icon;
-              return (
+      {isTahsinPage ? (
+        <section className="mt-8 space-y-3 sm:mt-10" aria-label="Pilih jenis kelas">
+          {CATEGORY_OPTIONS.map((cat) => {
+            const list = groups.filter((g) => classCategory(g.rombels[0]) === cat.value);
+            const open = openCat === cat.value;
+            return (
+              <div key={cat.value} className={`overflow-hidden rounded-3xl border bg-card shadow-sm transition ${open ? "border-primary" : ""}`}>
                 <button
-                  key={option.value}
                   type="button"
-                  aria-pressed={isActive}
-                  onClick={() => setSelectedGender(option.value)}
-                  className={[
-                    "group flex min-h-16 items-center gap-3 rounded-2xl border p-3 text-left transition-all duration-200",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                    isActive
-                      ? "border-primary bg-primary text-primary-foreground shadow-soft"
-                      : "border-border bg-background/80 text-foreground hover:-translate-y-0.5 hover:border-primary/40 hover:bg-card hover:shadow-sm",
-                  ].join(" ")}
+                  aria-expanded={open}
+                  onClick={() => setOpenCat(open ? null : cat.value)}
+                  className={`flex w-full items-center gap-3 p-4 text-left sm:p-5 ${open ? "bg-primary/10" : "hover:bg-secondary/60"}`}
                 >
-                  <span className={[
-                    "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors",
-                    isActive ? "bg-primary-foreground/15" : "bg-secondary text-primary group-hover:bg-primary/10",
-                  ].join(" ")}>
-                    {isActive ? <Check className="h-5 w-5" aria-hidden="true" /> : <Icon className="h-5 w-5" aria-hidden="true" />}
-                  </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block font-semibold">{option.label}</span>
-                    <span className={[
-                      "mt-0.5 block text-xs",
-                      isActive ? "text-primary-foreground/80" : "text-muted-foreground",
-                    ].join(" ")}>
-                      {option.description}
-                    </span>
+                    <span className="block text-lg font-bold text-foreground">{cat.label}</span>
+                    <span className="block text-xs text-muted-foreground">{list.length} program</span>
                   </span>
-                  <ArrowRight className={[
-                    "h-4 w-4 shrink-0 transition-transform",
-                    isActive ? "translate-x-0 opacity-100" : "-translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-70",
-                  ].join(" ")} aria-hidden="true" />
+                  <ChevronDown className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
                 </button>
-              );
-            })}
+                <div className={`grid transition-[grid-template-rows] duration-300 ${open ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}>
+                  <div className="overflow-hidden">
+                    <div className="px-3 pb-4 pt-2 sm:px-5">
+                      <ProgramCarousel groups={list} id={`${slug}-${cat.value}`} showCategory={false} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      ) : (
+        <section className="mt-9 sm:mt-10">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="text-xl font-bold text-foreground sm:text-2xl">Pilih program belajar</h2>
+            {groups.length > 0 && (
+              <span className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">{groups.length} program</span>
+            )}
           </div>
+          <ProgramCarousel groups={groups} id={slug} showCategory={false} />
         </section>
       )}
-
-      <section className="mt-9 sm:mt-10" aria-live="polite">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              {isTahsinPage ? selectedOption.label : "Kelas tersedia"}
-            </p>
-            <h2 className="mt-1 text-xl font-bold text-foreground sm:text-2xl">Pilih program belajar</h2>
-          </div>
-          {groupedPrograms.length > 0 && (
-            <span className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground">
-              {groupedPrograms.length} program
-            </span>
-          )}
-        </div>
-
-        {groupedPrograms.length > 0 ? (
-          <>
-            <Carousel
-              key={`${slug}-${selectedGender}`}
-              opts={{ align: "start", slidesToScroll: 1, containScroll: "trimSnaps" }}
-              className="mt-4 px-0 sm:px-6"
-            >
-              <CarouselContent className="-ml-4">
-                {groupedPrograms.map((group) => (
-                  <CarouselItem key={group.primaryClass.id} className="basis-[88%] pl-4 sm:basis-1/2 lg:basis-1/3">
-                    <div className="h-full [&>div]:h-full">
-                      <ProgramCard group={group} />
-                    </div>
-                  </CarouselItem>
-                ))}
-              </CarouselContent>
-              {groupedPrograms.length > 1 && (
-                <>
-                  <CarouselPrevious aria-label="Program sebelumnya" className="-left-1 hidden h-9 w-9 sm:inline-flex" />
-                  <CarouselNext aria-label="Program berikutnya" className="-right-1 hidden h-9 w-9 sm:inline-flex" />
-                </>
-              )}
-            </Carousel>
-            {groupedPrograms.length > 1 && (
-              <p className="mt-3 text-center text-xs text-muted-foreground">
-                Geser ke samping untuk melihat program lainnya <span aria-hidden="true">→</span>
-              </p>
-            )}
-          </>
-        ) : (
-          <div className="mt-4 rounded-2xl border border-dashed bg-card p-6 text-center sm:p-8">
-            <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-secondary text-primary">
-              <BookOpen className="h-5 w-5" aria-hidden="true" />
-            </span>
-            <p className="mt-3 font-semibold text-foreground">Belum ada program untuk pilihan ini</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Silakan pilih kelompok lain atau cek kembali nanti.
-            </p>
-          </div>
-        )}
-      </section>
     </main>
   );
 }
 
-function ProgramCard({
-  group,
-}: {
-  group: { primaryClass: any; rombels: any[]; rombelCount: number; cleanName: string };
-}) {
-  const c = group.primaryClass;
-  const rombelCount = group.rombelCount;
+function ProgramCarousel({ groups, id, showCategory }: { groups: ClassGroup[]; id: string; showCategory: boolean }) {
+  if (groups.length === 0) {
+    return (
+      <div className="mt-4 rounded-2xl border border-dashed bg-card p-6 text-center">
+        <p className="font-semibold text-foreground">Belum ada program di sini</p>
+        <p className="mt-1 text-sm text-muted-foreground">Cek kembali nanti.</p>
+      </div>
+    );
+  }
+  return (
+    <>
+      <Carousel key={id} opts={{ align: "start", slidesToScroll: 1, containScroll: "trimSnaps" }} className="mt-4 px-0 sm:px-6">
+        <CarouselContent className="-ml-4">
+          {groups.map((group) => (
+            <CarouselItem key={group.rombels[0].id} className="basis-[88%] pl-4 sm:basis-1/2 lg:basis-1/3">
+              <div className="h-full [&>div]:h-full">
+                <ProgramCard group={group} showCategory={showCategory} />
+              </div>
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+        {groups.length > 1 && (
+          <>
+            <CarouselPrevious aria-label="Program sebelumnya" className="-left-1 hidden h-9 w-9 sm:inline-flex" />
+            <CarouselNext aria-label="Program berikutnya" className="-right-1 hidden h-9 w-9 sm:inline-flex" />
+          </>
+        )}
+      </Carousel>
+      {groups.length > 1 && (
+        <p className="mt-3 text-center text-xs text-muted-foreground">
+          Geser ke samping untuk melihat program lainnya <span aria-hidden="true">→</span>
+        </p>
+      )}
+    </>
+  );
+}
+
+function ProgramCard({ group, showCategory }: { group: ClassGroup; showCategory: boolean }) {
+  const c = group.rombels[0];
+  const rombelCount = group.rombels.length;
   const targetGender = c.target_gender;
   const genderLabel = targetGender === "ikhwan" ? "Ikhwan · Laki-laki" : targetGender === "akhwat" ? "Akhwat · Perempuan" : null;
   const start = startingPrice(c);
   const regularPrice = start?.normal ?? 0;
   const hasPromo = !!start?.hasPromo;
   const finalPrice = start?.final ?? 0;
+  const lines = scheduleLines(group.rombels);
 
   return (
     <article className="group flex h-full flex-col overflow-hidden rounded-3xl border bg-card shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5">
       <div className="h-1.5 bg-gradient-to-r from-primary via-primary/70 to-primary/20" />
       <div className="flex flex-1 flex-col p-5 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <h3 className="text-xl font-bold leading-snug text-primary sm:text-2xl">{group.cleanName}</h3>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {genderLabel && (
-              <span
-                className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                  targetGender === "akhwat"
-                    ? "bg-rose-50 text-rose-700 ring-1 ring-rose-200"
-                    : "bg-sky-50 text-sky-700 ring-1 ring-sky-200"
-                }`}
-              >
-                {genderLabel}
-              </span>
-            )}
-            {rombelCount > 1 && (
-              <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">
-                {rombelCount} Pilihan Jam
-              </span>
-            )}
-          </div>
-        </div>
-
-        {c.tagline && <p className="mt-2 line-clamp-2 min-h-10 text-sm leading-relaxed text-muted-foreground">{c.tagline}</p>}
-
-        <div className="mt-4">
-          {rombelCount > 1 ? (
-            <div className="my-3 flex items-center gap-3 text-sm">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <GraduationCap className="h-5 w-5" />
-              </span>
-              <div>
-                <p className="text-xs text-muted-foreground">Pengajar</p>
-                <p className="font-semibold text-foreground">Sesuai jam belajar yang dipilih</p>
-              </div>
-            </div>
-          ) : (
-            <TeacherIdentity teacherId={c.teacher_id} />
+        <h3 className="text-xl font-bold leading-snug text-primary sm:text-2xl">{group.cleanName}</h3>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {genderLabel && (
+            <span
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                targetGender === "akhwat" ? "bg-rose-50 text-rose-700 ring-1 ring-rose-200" : "bg-sky-50 text-sky-700 ring-1 ring-sky-200"
+              }`}
+            >
+              {genderLabel}
+            </span>
+          )}
+          {showCategory && (
+            <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary">{categoryLabel(c)}</span>
           )}
         </div>
 
-        <ul className="mt-5 space-y-3 border-t pt-4 text-sm">
-          <li className="flex items-start gap-2.5 text-foreground/90">
-            <GraduationCap className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-            <span>{c.levels_label || `Level ${c.level_number || 1} · ${c.level_label || "Umum"}`}</span>
-          </li>
-          <li className="flex items-start gap-2.5 text-foreground/90">
-            <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-            <span>
-              {rombelCount > 1 ? (
-                <strong className="font-semibold text-primary">Tersedia {rombelCount} pilihan waktu (Kelas A, B, dst.)</strong>
-              ) : (
-                c.schedule || "Jadwal belum ditentukan"
-              )}
-            </span>
-          </li>
+        <ul className="mt-4 space-y-2.5 border-t pt-4 text-sm">
+          {(lines.length ? lines : ["Jadwal belum ditentukan"]).map((t) => (
+            <li key={t} className="flex items-start gap-2.5 font-medium text-foreground">
+              <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              <span>{t}</span>
+            </li>
+          ))}
           <li className="flex items-center gap-2.5 text-foreground/90">
-            <Users className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-            <span>
-              {rombelCount > 1 ? `Kuota ~${c.quota || 15} santri per kelas` : `Kuota ${c.quota || 15} santri`}
-            </span>
+            <Users className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+            <span>{rombelCount > 1 ? `Kuota ~${c.quota || 15} santri per kelas` : `Kuota ${c.quota || 15} santri`}</span>
           </li>
         </ul>
 
         <div className="mt-auto pt-6">
-          <p className="text-xs font-medium text-muted-foreground">Investasi belajar</p>
-          <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+          <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
             {(c.price_prefix || (start && "Mulai")) && <span className="text-sm text-muted-foreground">{c.price_prefix || "Mulai"}</span>}
             {hasPromo ? (
               <>
@@ -328,10 +207,8 @@ function ProgramCard({
             )}
             <span className="text-sm text-muted-foreground">/{start?.label ?? "paket"}</span>
           </div>
-          <Button asChild className="mt-4 w-full rounded-xl font-semibold transition-transform group-hover:translate-y-0">
-            <Link to="/kelas/$slug" params={{ slug: c.slug }}>
-              {rombelCount > 1 ? "Pilih Jadwal & Daftar" : "Lihat detail kelas"}
-            </Link>
+          <Button asChild className="mt-4 w-full rounded-xl font-semibold">
+            <Link to="/kelas/$slug" params={{ slug: c.slug }}>Lihat detail kelas</Link>
           </Button>
         </div>
       </div>
