@@ -48,23 +48,19 @@ export function PesertaTab() {
     await qc.invalidateQueries({ queryKey: ["notif-enrollments"] });
   };
 
-  async function confirmLunasWithWa(id: string) {
+  async function confirmLunas(id: string) {
     setLoadingId(id);
     try {
-      const res = await fetch("/api/public/confirm-paid", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enrollmentId: id }),
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        toast.error(json.error || "Gagal mengonfirmasi pembayaran.");
+      // Gunakan sesi admin aktif dan kebijakan RLS, jangan endpoint publik service-role.
+      const { error } = await sb.from("enrollments").update({ status: "paid" }).eq("id", id);
+      if (error) {
+        toast.error(`Gagal menyimpan konfirmasi: ${error.message}`);
         return;
       }
-      toast.success("Pembayaran lunas & notifikasi WhatsApp otomatis dikirim.");
+      toast.success("Pembayaran berhasil dikonfirmasi lunas.");
       await refresh();
-    } catch {
-      toast.error("Gagal menghubungkan ke server.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Gagal menyimpan konfirmasi pembayaran.");
     } finally {
       setLoadingId(null);
     }
@@ -199,15 +195,9 @@ export function PesertaTab() {
 
             <div className="flex flex-wrap gap-2">
               {r.status !== "paid" && (
-                <Button size="sm" variant="success" disabled={isBusy} onClick={() => confirmLunasWithWa(r.id)}>
+                <Button size="sm" variant="success" disabled={isBusy} onClick={() => confirmLunas(r.id)}>
                   <Send className="h-4 w-4 mr-1" />
-                  {isBusy ? "Memproses..." : "Konfirmasi Lunas & Kirim WA"}
-                </Button>
-              )}
-              {r.status === "paid" && (
-                <Button size="sm" variant="secondary" disabled={isBusy} onClick={() => confirmLunasWithWa(r.id)}>
-                  <Send className="h-4 w-4 mr-1" />
-                  {isBusy ? "Mengirim..." : "Kirim Ulang WA Fonnte"}
+                  {isBusy ? "Menyimpan..." : "Konfirmasi Lunas"}
                 </Button>
               )}
               {r.status !== "rejected" && (
