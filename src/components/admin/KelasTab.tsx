@@ -16,16 +16,12 @@ import { buildPackagePrices, getPackagePrice, monthlyChoices, packageCounts, pac
 import { DAYS, formatSchedule, slotsForSave, slotsOf, type Day, type ScheduleSlot } from "@/lib/schedule";
 import { settingsQuery } from "@/lib/queries";
 import { groupClasses, nextRombelName, splitRombelName, type ClassGroup } from "@/lib/class-groups";
+import { CATEGORY_OPTIONS, categoryLabel, classCategory } from "@/lib/class-category";
 import { parseTeachers } from "@/lib/teachers";
 import { sb, field, slugify, useClasses, useSubjects } from "./shared";
 
 const WEEK_OPTIONS = [{ v: 1, l: "1 minggu" }, { v: 2, l: "2 minggu" }, { v: 3, l: "3 minggu" }, { v: 4, l: "1 bulan" }];
 
-const LEVELS = [
-  { n: 1, l: "Pemula" },
-  { n: 2, l: "Umum" },
-  { n: 3, l: "Lanjutan" },
-];
 const GENDER_FILTERS = [
   { v: "all", l: "Semua" },
   { v: "ikhwan", l: "Ikhwan" },
@@ -151,7 +147,7 @@ export function KelasTab() {
         prices: { monthly: { "1": { normal: "", promo: "" } }, session: {} } as PriceTable,
         slots: [] as ScheduleSlot[], schedule: "",
         subject_id: subjectId || "", target_gender: genderFilter === "ikhwan" || genderFilter === "akhwat" ? genderFilter : "all",
-        level_number: 1, level_label: "Pemula", quota: 15, sort_order: classes.length + 1, whatsapp_link: "", zoom_link: "",
+        level_number: 1, level_label: "Pra Tahsin", quota: 15, sort_order: classes.length + 1, whatsapp_link: "", zoom_link: "",
       });
     }
     const { data } = await sb.from("class_private").select("*").eq("class_id", c.id).maybeSingle();
@@ -227,7 +223,7 @@ export function KelasTab() {
         for (const k of ["subject_id", "tagline", "description", "goals", "advantages", "price_prefix", "target_gender"] as const) if (changed(k)) update[k] = now[k];
         if (changed("level")) {
           const [n, l] = now.level.split("|");
-          update.level_number = Number(n); update.level_label = l; update.levels_label = `Level ${n} · ${l}`;
+          update.level_number = Number(n); update.level_label = l; update.levels_label = l;
         }
         if (pricing) Object.assign(update, pricing);
         if (Object.keys(update).length === 0) continue;
@@ -266,7 +262,7 @@ export function KelasTab() {
       subject_id: edit.subject_id,
       level_number: lvl,
       level_label: label,
-      levels_label: `Level ${lvl} · ${label}`,
+      levels_label: label,
       schedule_slots: slotsForSave(edit.slots ?? []),
       // Pengajar utama = pengajar hari pertama; tanpa jadwal, memakai pilihan tunggal.
       teacher_id: (edit.slots?.length ? [...edit.slots].sort((a: ScheduleSlot, b: ScheduleSlot) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day)).find((x: ScheduleSlot) => x.teacherId)?.teacherId : edit.teacher_id) || null,
@@ -327,7 +323,6 @@ export function KelasTab() {
       for (const m of months) if (!prices.monthly[String(m)]) prices.monthly[String(m)] = { normal: "", promo: "" };
       return { ...e, package_weeks: w, available_months: months, prices };
     });
-  const levelKnown = LEVELS.some((l) => l.n === Number(edit?.level_number) && l.l === edit?.level_label);
   const priceRow = (kind: "monthly" | "session", count: number) => {
     const row = edit?.prices?.[kind]?.[String(count)] ?? { normal: "", promo: "" };
     return (
@@ -393,7 +388,7 @@ export function KelasTab() {
                 <div className="min-w-0">
                   <h3 className="text-lg font-bold leading-snug text-primary">{g.cleanName}</h3>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs font-semibold">
-                    <span className="rounded-full bg-secondary px-2.5 py-1 text-secondary-foreground">Level {first.level_number} · {first.level_label}</span>
+                    <span className="rounded-full bg-secondary px-2.5 py-1 text-secondary-foreground">{categoryLabel(first)}</span>
                     <span className={`rounded-full px-2.5 py-1 ${gender === "akhwat" ? "bg-rose-50 text-rose-700 ring-1 ring-rose-200" : gender === "ikhwan" ? "bg-sky-50 text-sky-700 ring-1 ring-sky-200" : "bg-secondary text-secondary-foreground"}`}>{GENDER_LABEL[gender]}</span>
                     <span className="rounded-full bg-primary/10 px-2.5 py-1 text-primary">{g.rombels.length} rombel{activeCount < g.rombels.length ? ` · ${activeCount} aktif` : ""}</span>
                   </div>
@@ -474,8 +469,8 @@ export function KelasTab() {
               )}
               {mode === "rombel" && (
                 <p className="rounded-xl bg-secondary/60 p-3 text-sm text-muted-foreground">
-                  Program: <strong className="text-foreground">{splitRombelName(edit.name).base}</strong> · Level {edit.level_number} {edit.level_label} · {GENDER_LABEL[edit.target_gender || "all"]}.
-                  {" "}Nama program, deskripsi, level, dan kelompok diubah lewat <strong>Ubah program</strong>.
+                  Program: <strong className="text-foreground">{splitRombelName(edit.name).base}</strong> · {categoryLabel(edit)} · {GENDER_LABEL[edit.target_gender || "all"]}.
+                  {" "}Nama program, deskripsi, kategori, dan kelompok diubah lewat <strong>Ubah program</strong>.
                 </p>
               )}
 
@@ -491,11 +486,10 @@ export function KelasTab() {
                 {txt("description", "Deskripsi", true)}
                 {txt("goals", "Tujuan", true)}
                 {txt("advantages", "Keunggulan (satu per baris)", true)}
-                <div className="space-y-1"><Label>Level</Label>
-                  <select className={field} value={`${edit.level_number}|${edit.level_label}`}
-                    onChange={(e) => { const [n, l] = e.target.value.split("|"); setEdit((x: any) => ({ ...x, level_number: Number(n), level_label: l })); }}>
-                    {!levelKnown && <option value={`${edit.level_number}|${edit.level_label}`}>Level {edit.level_number} {edit.level_label} (lama)</option>}
-                    {LEVELS.map((l) => <option key={l.n} value={`${l.n}|${l.l}`}>Level {l.n} · {l.l}</option>)}
+                <div className="space-y-1"><Label>Kategori</Label>
+                  <select className={field} value={classCategory(edit)}
+                    onChange={(e) => { const o = CATEGORY_OPTIONS.find((x) => x.value === e.target.value)!; setEdit((x: any) => ({ ...x, level_number: o.levelNumber, level_label: o.label })); }}>
+                    {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select></div>
                 <div className="space-y-1"><Label>Untuk</Label>
                   <select className={field} value={edit.target_gender ?? "all"} onChange={(e) => set("target_gender", e.target.value)}>
