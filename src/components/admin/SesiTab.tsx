@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { FileText, GraduationCap, Pencil, Upload } from "lucide-react";
+import { Copy, FileText, GraduationCap, MessageCircle, Pencil, Share2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,24 @@ import { FILE_MAX_BYTES, fileExt, openPrivateFile } from "@/lib/session-content"
 import { tanggal } from "@/lib/format";
 import { classHasTeacher } from "@/lib/schedule";
 import { sb, field, safeFileName, useClasses, useSubjects } from "./shared";
+
+/** Pesan pengingat sesi untuk dibagikan manual lewat WhatsApp. */
+function shareText(className: string, s: { number: number; title: string; scheduled_at?: string | null; zoom_link?: string | null }) {
+  return (
+    `*Pengingat Sesi Belajar — PadatIlmu*\n\n` +
+    (className ? `Kelas *${className}*\n` : "") +
+    `Sesi ${s.number}: ${s.title}\n` +
+    (s.scheduled_at ? `Jadwal: ${s.scheduled_at}\n` : "") +
+    (s.zoom_link ? `\nLink Zoom:\n${s.zoom_link}\n` : "") +
+    `\nMohon bersiap tepat waktu. Jazakumullahu khairan.`
+  );
+}
+
+/** Buka WhatsApp dengan pesan siap kirim; admin tinggal memilih kontak atau grup. */
+function openWa(text: string) {
+  const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+  if (!window.open(url, "_blank", "noopener")) window.location.href = url;
+}
 
 export function SesiTab({ allowedClassIds, teacherId, allowAll }: { allowedClassIds?: string[] | "all"; teacherId?: string; allowAll?: boolean }) {
   const { data: allClasses = [] } = useClasses();
@@ -93,6 +111,13 @@ export function SesiTab({ allowedClassIds, teacherId, allowAll }: { allowedClass
     toast.success("PDF terunggah. Tekan Simpan untuk menyimpan sesi.");
   }
 
+  async function shareSession(s: any) {
+    const { data, error } = await sb.from("session_private").select("zoom_link").eq("session_id", s.id).maybeSingle();
+    if (error) return toast.error("Gagal mengambil link Zoom: " + error.message);
+    const cls = classes.find((c) => c.id === s.class_id) ?? classes.find((c) => c.id === classId);
+    openWa(shareText(cls ? classLevelName(cls) : "", { ...s, zoom_link: data?.zoom_link ?? "" }));
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -118,6 +143,7 @@ export function SesiTab({ allowedClassIds, teacherId, allowAll }: { allowedClass
             <p className="text-sm text-muted-foreground">{s.scheduled_at || "Jadwal belum diisi"} · {s.is_published ? "Terbit" : "Draf (tersembunyi)"}</p>
           </div>
           <div className="flex shrink-0 gap-2">
+            <Button variant="outline" size="icon" aria-label="Bagikan ke WhatsApp" title="Bagikan ke WhatsApp" onClick={() => void shareSession(s)}><Share2 className="h-4 w-4" /></Button>
             <Button variant="outline" size="icon" aria-label="Nilai dan tugas" title="Nilai dan tugas" onClick={() => setGrading(s)}><GraduationCap className="h-4 w-4" /></Button>
             <Button variant="outline" size="icon" aria-label="Ubah sesi" onClick={() => openEdit(s)}><Pencil className="h-4 w-4" /></Button>
             <AdminDelete name={`sesi ${s.number}`} description="Sesi beserta rekaman, link Zoom, tugas, dan nilai terkait dihapus permanen."
@@ -138,7 +164,11 @@ export function SesiTab({ allowedClassIds, teacherId, allowAll }: { allowedClass
               <div className="space-y-1"><Label>Judul</Label><Input value={edit.title} onChange={(e) => set("title", e.target.value)} /></div>
               <div className="space-y-1"><Label>Deskripsi</Label><Textarea value={edit.description ?? ""} onChange={(e) => set("description", e.target.value)} /></div>
               <div className="space-y-1"><Label>Jadwal sesi</Label><Input value={edit.scheduled_at ?? ""} onChange={(e) => set("scheduled_at", e.target.value)} placeholder="Jumat, 14 Nov 2026 · 19.30 WIB" /></div>
-              <div className="space-y-1"><Label>Link Zoom sesi ini</Label><Input value={edit.zoom_link ?? ""} onChange={(e) => set("zoom_link", e.target.value)} /></div>
+              <div className="space-y-1"><Label>Link Zoom sesi ini</Label><Input value={edit.zoom_link ?? ""} onChange={(e) => set("zoom_link", e.target.value)} />
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <Button type="button" variant="success" size="sm" onClick={() => { const cls = classes.find((c) => c.id === (edit.class_id ?? classId)); openWa(shareText(cls ? classLevelName(cls) : "", edit)); }}><MessageCircle className="h-4 w-4" /> Bagikan ke WhatsApp</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => { const cls = classes.find((c) => c.id === (edit.class_id ?? classId)); void navigator.clipboard.writeText(shareText(cls ? classLevelName(cls) : "", edit)).then(() => toast.success("Pesan disalin"), () => toast.error("Gagal menyalin")); }}><Copy className="h-4 w-4" /> Salin pesan</Button>
+                </div></div>
               <div className="space-y-1"><Label>Link video rekaman (YouTube / Drive / Vimeo)</Label><Input value={edit.video_url ?? ""} onChange={(e) => set("video_url", e.target.value)} /></div>
               <div className="space-y-2">
                 <Label>Materi PDF</Label>
