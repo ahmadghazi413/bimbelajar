@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Landmark, MessageCircle, QrCode, Upload, Zap, CreditCard, Copy, Check, ChevronDown } from "lucide-react";
+import { Landmark, MessageCircle, QrCode, Upload, Zap, CreditCard, Copy, Check, ChevronDown, GraduationCap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { classDetailQuery, settingsQuery } from "@/lib/queries";
 import { rupiah } from "@/lib/format";
@@ -18,6 +18,7 @@ import { canConfirmPayment, validateProof } from "@/lib/payment-proofs";
 import { PaymentProof } from "@/components/PaymentProof";
 import { createIpaymuPayment } from "@/lib/ipaymu.functions";
 import { parseBankAccounts, type BankAccount } from "@/lib/bank-accounts";
+import { categoryLabel, scheduleLines } from "@/lib/class-category";
 
 export const Route = createFileRoute("/_authenticated/bayar/$slug")({
   head: () => ({
@@ -288,8 +289,7 @@ function Bayar() {
 
   return (
     <Page
-      title={`Daftar ${c.name} — Level ${c.level_number} ${c.level_label}`}
-      subtitle={start ? `${c.price_prefix ?? ""} ${rupiah(start.final)} / ${start.label}`.trim() : ""}
+      title="Pembayaran"
     >
       {enr.isPending ? (
         <p>Memuat pendaftaran...</p>
@@ -383,7 +383,7 @@ function Bayar() {
               </div>
             </div>
           )}
-          {effType === "monthly" && (
+          {effType === "monthly" && monthOptions.length !== 1 && (
             <div className="space-y-3 rounded-2xl bg-secondary/40 p-4">
               <Label className="text-sm font-semibold">Pilih Lama Berlangganan</Label>
 
@@ -460,16 +460,28 @@ function Bayar() {
             </div>
           )}
 
-          <div className="flex items-center justify-between rounded-2xl bg-secondary/50 p-4">
-            <div>
-              <p className="text-xs text-muted-foreground">Paket yang dipilih</p>
-              <p className="font-semibold text-sm">
-                {effType === "monthly"
-                  ? `Paket Berlangganan (${packageLabel("monthly", effMonths, unitWeeks(c))})`
-                  : `Paket ${effSessions} Sesi Pertemuan`}
-              </p>
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-muted-foreground">Paket yang dibeli</p>
+            <div className="flex items-center gap-3 rounded-2xl border bg-card p-3.5">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <GraduationCap className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold">
+                  {effType === "monthly" ? `Paket ${packageLabel("monthly", effMonths, unitWeeks(c))}` : `Paket ${effSessions} Sesi`}
+                </p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {/tahsin/i.test(c.name) ? `Kelas ${categoryLabel(c)}` : c.name}
+                  {scheduleLines([c])[0] ? ` · ${scheduleLines([c])[0]}` : ""}
+                </p>
+              </div>
+              <div className="text-right">
+                {(effType === "monthly" ? monthlyEntry : sessionEntry).hasPromo && (
+                  <p className="text-[11px] text-muted-foreground line-through">{rupiah((effType === "monthly" ? monthlyEntry : sessionEntry).normal)}</p>
+                )}
+                <p className="font-display text-lg font-bold text-primary">{rupiah(basePrice)}</p>
+              </div>
             </div>
-            <p className="font-display text-lg font-bold text-primary">{rupiah(basePrice)}</p>
           </div>
 
           <div className="space-y-2">
@@ -516,9 +528,15 @@ function Bayar() {
             </div>
           )}
 
-          <div className="rounded-2xl border-2 border-primary/20 bg-primary/5 p-4 flex items-center justify-between">
-            <span className="font-semibold text-sm">Total yang Harus Dibayar</span>
-            <span className="font-display text-xl font-extrabold text-primary">{rupiah(finalPrice)}</span>
+          <div className="space-y-1.5 rounded-2xl border bg-card p-4 text-sm">
+            <p className="font-semibold">Ringkasan pesanan</p>
+            <div className="flex justify-between text-muted-foreground"><span>Total harga (1 item)</span><span>{rupiah(basePrice)}</span></div>
+            {discountAmount > 0 && <div className="flex justify-between text-success"><span>Diskon</span><span>-{rupiah(discountAmount)}</span></div>}
+            {rewardAmount > 0 && <div className="flex justify-between text-success"><span>Saldo bonus</span><span>-{rupiah(rewardAmount)}</span></div>}
+            <div className="flex items-baseline justify-between border-t pt-2 font-semibold">
+              <span>Total pembayaran</span>
+              <span className="font-display text-xl font-extrabold text-primary">{rupiah(finalPrice)}</span>
+            </div>
           </div>
 
           {canManual && (
@@ -542,15 +560,6 @@ function Bayar() {
                 </div>
               </div>
 
-              <Button
-                variant="hero"
-                size="lg"
-                className="w-full text-base font-bold shadow-md"
-                disabled={busy || quote.isFetching || (!!voucher.trim() && !applied)}
-                onClick={bayarIpaymu}
-              >
-                {busy ? "Menyiapkan Pembayaran..." : `Bayar Sekarang ${rupiah(finalPrice)} (iPaymu)`}
-              </Button>
             </div>
           ) : effPick ? (
             <div className="space-y-4 pt-1">
@@ -570,24 +579,35 @@ function Bayar() {
               <ProofUpload busy={busy} hasProof={!!stagedProof} onPick={uploadProof} />
               {stagedProof && <p className="text-sm text-muted-foreground">File dipilih: {stagedProof.name}</p>}
 
+            </div>
+          ) : null}
+
+          {effPick && (
+            <div className="flex items-center gap-3 rounded-2xl border bg-card p-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] text-muted-foreground">Total pembayaran</p>
+                <p className="font-display text-xl font-bold">{rupiah(finalPrice)}</p>
+              </div>
               <Button
                 variant="hero"
                 size="lg"
-                className="w-full"
+                className="px-8 font-bold"
                 disabled={
-                  !canConfirmPayment(stagedProof?.name, busy) ||
-                  !sender.trim() ||
-                  quote.isFetching ||
-                  !!quote.error ||
-                  !quote.data ||
-                  (!!voucher.trim() && !applied)
+                  effPick === "ipaymu"
+                    ? busy || quote.isFetching || (!!voucher.trim() && !applied)
+                    : !canConfirmPayment(stagedProof?.name, busy) ||
+                      !sender.trim() ||
+                      quote.isFetching ||
+                      !!quote.error ||
+                      !quote.data ||
+                      (!!voucher.trim() && !applied)
                 }
-                onClick={daftarManual}
+                onClick={effPick === "ipaymu" ? bayarIpaymu : daftarManual}
               >
-                {busy ? "Memproses..." : "Saya sudah bayar"}
+                {busy ? "Memproses..." : "Bayar"}
               </Button>
             </div>
-          ) : null}
+          )}
         </div>
       )}
 
@@ -650,7 +670,7 @@ function PayAccordion({
   ];
   return (
     <div className="space-y-2 pt-2">
-      <Label className="font-semibold text-sm">Pilih Cara Pembayaran:</Label>
+      <Label className="font-semibold text-sm">Pilih metode pembayaran</Label>
       {items.map((it) => {
         const open = selected === it.id;
         const Icon = it.id === "ipaymu" ? Zap : it.id === "bank" ? Landmark : QrCode;
