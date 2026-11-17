@@ -7,7 +7,10 @@ import { Button } from "@/components/ui/button";
 import { StudentSessions } from "@/components/StudentSessions";
 import { packageEnd, daysLeft } from "@/lib/notifications";
 import { packageTitle, tanggal } from "@/lib/format";
-import { TeacherIdentity } from "@/components/TeacherIdentity";
+import { publicTeachersQuery } from "@/components/TeacherIdentity";
+import { classTeacherIds } from "@/lib/schedule";
+import { categoryLabel, scheduleLines } from "@/lib/class-category";
+import { splitRombelName } from "@/lib/class-groups";
 
 export const Route = createFileRoute("/_authenticated/kelas-saya")({
   head: () => ({ meta: [{ title: "Kelas Saya — Bimbelajar" }, { name: "description", content: "Kelas ngaji yang Anda ikuti, jadwal dan akses belajar Bimbelajar." }, { property: "og:title", content: "Kelas Saya — Bimbelajar" }, { property: "og:description", content: "Kelas ngaji yang Anda ikuti, jadwal dan akses belajar Bimbelajar." }, { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary_large_image" }] }),
@@ -28,6 +31,28 @@ function getPackageAlert(enrollment: any) {
   return null;
 }
 
+function TeacherInline({ c }: { c: any }) {
+  const { data: teachers } = useQuery(publicTeachersQuery);
+  const list = classTeacherIds(c)
+    .map((id) => teachers?.find((t) => t.id === id))
+    .filter(Boolean) as { id: string; name: string; photoUrl?: string }[];
+  if (list.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+      {list.map((t) => (
+        <span key={t.id} className="inline-flex items-center gap-2 text-sm">
+          {t.photoUrl ? (
+            <img src={t.photoUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
+          ) : (
+            <span className="grid h-7 w-7 place-items-center rounded-full bg-secondary text-[10px] font-bold text-primary">{(t.name ?? "").slice(0, 2).toUpperCase()}</span>
+          )}
+          <span className="font-medium">{t.name}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function PackageStatus({ e, slug }: { e: any; slug: string }) {
   const end = packageEnd(e);
   if (!end) {
@@ -35,7 +60,7 @@ function PackageStatus({ e, slug }: { e: any; slug: string }) {
     const used = e.sessions_used || 0;
     const sisa = Math.max(total - used, 0);
     return (
-      <div className="mt-4 rounded-2xl bg-secondary/50 p-4 text-sm">
+      <div className="mt-3 rounded-2xl bg-secondary/50 p-3 text-sm">
         <p className="font-semibold">Paket {total} sesi</p>
         {used > 0 && <p className="text-muted-foreground">Sisa {sisa} sesi</p>}
       </div>
@@ -44,7 +69,7 @@ function PackageStatus({ e, slug }: { e: any; slug: string }) {
   const d = daysLeft(end);
   const tone = d <= 0 ? "bg-destructive text-destructive-foreground" : d <= 7 ? "bg-warning text-warning-foreground" : "bg-secondary/50";
   return (
-    <div className={`mt-4 rounded-2xl p-4 text-sm ${tone}`}>
+    <div className={`mt-3 rounded-2xl p-3 text-sm ${tone}`}>
       <p className="font-semibold">Paket {packageTitle(e)}</p>
       <p>
         {d <= 0 ? "Paket sudah habis" : `Sisa ${d} hari`} · berlaku sampai {tanggal(end.toISOString())}
@@ -93,7 +118,7 @@ function KelasSaya() {
           <Button asChild variant="hero" className="mt-4"><Link to="/kelas">Pilih Kelas</Link></Button>
         </div>
       )}
-      <div className="space-y-6">
+      <div className="space-y-4">
         {list.map((e) => {
           const c = e.classes;
           if (!c) return null;
@@ -101,23 +126,33 @@ function KelasSaya() {
           const endAt = packageEnd(e);
           const locked = !!endAt && daysLeft(endAt) <= 0;
           return (
-            <div key={e.id} className="rounded-3xl border bg-card p-6">
+            <div key={e.id} className="rounded-3xl border bg-card p-4 sm:p-6">
               <div className="flex items-start justify-between gap-2">
-                <h2 className="text-2xl font-semibold text-primary">{c.name}</h2>
+                <div className="min-w-0">
+                  <h2 className="text-xl font-semibold leading-tight text-primary sm:text-2xl">
+                    {/tahsin/i.test(c.name) ? `Kelas ${categoryLabel(c)}` : splitRombelName(c.name).base}
+                  </h2>
+                  {splitRombelName(c.name).label && (
+                    <span className="mt-1 inline-block rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">Kelas {splitRombelName(c.name).label}</span>
+                  )}
+                </div>
                 <StatusBadge status={e.status} />
               </div>
-              <p className="mt-2 flex items-center gap-2 text-muted-foreground"><CalendarDays className="h-4 w-4" /> {c.schedule}</p>
-              <TeacherIdentity teacherId={c.teacher_id} />
+              <p className="mt-2 flex items-start gap-2 text-sm text-muted-foreground">
+                <CalendarDays className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{scheduleLines([c]).join(" · ") || c.schedule}</span>
+              </p>
+              <TeacherInline c={c} />
               {e.status === "paid" ? (
                 <>
                   <PackageStatus e={e} slug={c.slug} />
                   {renewalPending(e.class_id) && (
                     <p className="mt-2 text-sm text-muted-foreground">Perpanjangan Anda menunggu konfirmasi admin.</p>
                   )}
-                  <div className="mt-4 grid gap-3">
+                  <div className="mt-3 grid gap-3">
                     {p?.whatsapp_link && <Button asChild variant="success" size="lg"><a href={p.whatsapp_link} target="_blank" rel="noreferrer"><MessageCircle /> Gabung Grup WhatsApp</a></Button>}
                   </div>
-                  <h3 className="mb-3 mt-6 text-lg font-semibold">Jadwal & materi sesi</h3>
+                  <h3 className="mb-2 mt-5 text-base font-semibold">Jadwal & materi sesi</h3>
                   <StudentSessions
                     classId={c.id}
                     userId={userId}
