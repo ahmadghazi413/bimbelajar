@@ -225,11 +225,14 @@ export function KelasTab() {
       pricing = pr.cols;
     }
     try {
-      for (const r of group.rombels as any[]) {
+      const rombelsList = group.rombels as any[];
+      for (let i = 0; i < rombelsList.length; i++) {
+        const r = rombelsList[i];
         const update: Record<string, any> = {};
         if (changed("name")) {
           const { label } = splitRombelName(r.name);
-          update.name = label ? `${now.name.trim()} Kelas ${label}` : now.name.trim();
+          const letter = label || (rombelsList.length > 1 ? String.fromCharCode(65 + i) : "");
+          update.name = letter ? `${now.name.trim()} Kelas ${letter}` : now.name.trim();
         }
         for (const k of ["subject_id", "tagline", "description", "goals", "advantages", "price_prefix", "target_gender"] as const) if (changed(k)) update[k] = now[k];
         if (changed("level")) {
@@ -429,15 +432,20 @@ export function KelasTab() {
 
               {expanded && (
                 <ul className="divide-y rounded-2xl border bg-background/60">
-                  {g.rombels.map((c) => {
+                  {g.rombels.map((c, rIdx) => {
                     const start = startingPrice(c);
                     const { label } = splitRombelName(c.name);
                     const filled = counts[c.id] ?? 0;
+                    const rombelTitle = label
+                      ? `Kelas ${label}`
+                      : g.rombels.length > 1
+                        ? `Kelas ${String.fromCharCode(65 + rIdx)}`
+                        : c.name;
                     return (
                       <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 p-3">
                         <div className="min-w-0 space-y-0.5">
                           <p className="font-semibold">
-                            {label ? `Kelas ${label}` : c.name}
+                            {rombelTitle}
                             {!c.is_active && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">nonaktif</span>}
                           </p>
                           {slotsOf(c).length > 0 ? (
