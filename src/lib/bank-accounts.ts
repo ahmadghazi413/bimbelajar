@@ -1,3 +1,4 @@
+/** Daftar rekening bank untuk pembayaran manual. Disimpan sebagai JSON di settings["bank_accounts"]. */
 export type BankAccount = { bank: string; number: string; holder: string };
 
 export function parseBankAccounts(settings?: Record<string, string | null | undefined>): BankAccount[] {

@@ -35,3 +35,15 @@ export function scheduleLines(classes: any[]): string[] {
   }
   return [...new Set(out)];
 }
+
+/** Deskripsi bawaan yang tampil di bawah judul kategori; bisa diubah dari Edit kelas di admin. */
+export const DEFAULT_CATEGORY_DESC: Record<ClassCategory, string> = {
+  "pra-tahsin": "Untuk yang baru mulai dari nol: mengenal huruf hijaiyah dan membaca dasar dengan tenang.",
+  tahsin: "Untuk yang sudah bisa membaca: merapikan makhraj, sifat huruf, dan hukum tajwid.",
+};
+
+export const categoryDescKey = (cat: ClassCategory) => `category_desc_${cat}`;
+
+export function categoryDescription(settings: Record<string, string | null | undefined> | undefined, cat: ClassCategory) {
+  return settings?.[categoryDescKey(cat)]?.trim() || DEFAULT_CATEGORY_DESC[cat];
+}
