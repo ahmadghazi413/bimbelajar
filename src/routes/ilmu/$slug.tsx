@@ -1,10 +1,10 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { ArrowLeft, BookOpen, CalendarDays, ChevronDown, Users } from "lucide-react";
 import { useState } from "react";
-import { subjectClassesQuery } from "@/lib/queries";
+import { settingsQuery, subjectClassesQuery } from "@/lib/queries";
 import { groupClasses, type ClassGroup } from "@/lib/class-groups";
-import { CATEGORY_OPTIONS, categoryLabel, classCategory, scheduleLines, type ClassCategory } from "@/lib/class-category";
+import { CATEGORY_OPTIONS, categoryDescription, categoryLabel, classCategory, scheduleLines, type ClassCategory } from "@/lib/class-category";
 import { Button } from "@/components/ui/button";
 import { rupiah } from "@/lib/format";
 import { startingPrice } from "@/lib/package-prices";
@@ -39,6 +39,7 @@ export const Route = createFileRoute("/ilmu/$slug")({
 function IlmuPage() {
   const { slug } = Route.useParams();
   const { data } = useSuspenseQuery(subjectClassesQuery(slug));
+  const { data: settings } = useQuery(settingsQuery);
   const [openCat, setOpenCat] = useState<ClassCategory | null>(null);
 
   if (!data.subject) return null;
@@ -82,8 +83,11 @@ function IlmuPage() {
                   className={`flex w-full items-center gap-3 p-4 text-left sm:p-5 ${open ? "bg-primary/10" : "hover:bg-secondary/60"}`}
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block text-lg font-bold text-foreground">{cat.label}</span>
-                    <span className="block text-xs text-muted-foreground">{list.length} program</span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-lg font-bold text-foreground">{cat.label}</span>
+                      <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-secondary-foreground">{list.length} program</span>
+                    </span>
+                    <span className="mt-1 block text-sm leading-snug text-muted-foreground">{categoryDescription(settings, cat.value)}</span>
                   </span>
                   <ChevronDown className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
                 </button>
