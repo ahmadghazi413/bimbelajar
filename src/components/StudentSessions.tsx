@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { FileText, PlayCircle, Upload, Video as VideoIcon } from "lucide-react";
+import { ChevronDown, FileText, PlayCircle, Upload, Video as VideoIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SessionList } from "@/components/SessionList";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,7 +15,7 @@ type Sub = { session_id: string; file_path: string; file_name: string; created_a
 type Res = { session_id: string; grade: number | null; feedback: string };
 
 function SessionItem({
-  s, classId, userId, priv, rec, sub, res, onChanged,
+  s, classId, userId, priv, rec, sub, res, onChanged, highlight = false,
 }: {
   s: Tables<"class_sessions">;
   classId: string;
@@ -25,7 +25,9 @@ function SessionItem({
   sub?: Sub | undefined;
   res?: Res | undefined;
   onChanged: () => void;
+  highlight?: boolean;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -75,92 +77,103 @@ function SessionItem({
   const graded = !!res && (res.grade != null || !!res.feedback);
 
   return (
-    <li className="space-y-3">
-      <div className="flex gap-3">
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-secondary text-sm font-semibold text-primary">{s.number}</span>
-        <div className="min-w-0 flex-1">
-          <p className="font-medium">{s.title}</p>
-          {s.description && <p className="text-sm text-muted-foreground">{s.description}</p>}
-          {s.scheduled_at && <p className="text-xs text-primary">{s.scheduled_at}</p>}
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
+    <li className={`overflow-hidden rounded-2xl border bg-card ${highlight ? "border-primary ring-1 ring-primary/20" : ""}`}>
+      <div className="flex items-center gap-2 p-2.5">
+        <button type="button" aria-expanded={expanded} onClick={() => setExpanded((o) => !o)} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
+          <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold ${highlight ? "bg-primary/10 text-primary" : "bg-secondary text-primary"}`}>{s.number}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium">{s.title}</span>
+            <span className="block text-xs text-muted-foreground">
+              {s.scheduled_at || "Jadwal menyusul"}
+              {highlight ? " · berikutnya" : ""}
+            </span>
+          </span>
+          {graded && res!.grade != null && <span className="shrink-0 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">Nilai {res!.grade}</span>}
+          <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
+        </button>
         {priv?.zoom_link && (
-          <Button asChild size="sm" variant="hero">
-            <a href={priv.zoom_link} target="_blank" rel="noreferrer"><VideoIcon /> Masuk Zoom</a>
-          </Button>
-        )}
-        {priv?.material_path && (
-          <Button size="sm" variant="outline" onClick={() => open("session-materials", priv.material_path)}>
-            <FileText /> Materi PDF
-          </Button>
-        )}
-        {rec && (
-          <Button size="sm" variant="outline" onClick={() => setPlaying(!playing)}>
-            <PlayCircle /> {playing ? "Tutup rekaman" : "Tonton rekaman"}
+          <Button asChild size="sm" variant="hero" className="shrink-0">
+            <a href={priv.zoom_link} target="_blank" rel="noreferrer"><VideoIcon /> Zoom</a>
           </Button>
         )}
       </div>
 
-      {playing && rec && (embed ? (
-        <div className="space-y-2">
-          {/* Lebar penuh sampai tepi kartu agar tombol layar penuh tampil di HP */}
-          <div className="-mx-4 aspect-video bg-foreground">
-            <iframe
-              src={embed}
-              title={s.title}
-              className="h-full w-full"
-              allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
-              allowFullScreen
-            />
-          </div>
-          <a href={rec.video_url} target="_blank" rel="noreferrer" className="block text-sm text-primary underline">
-            Buka di aplikasi / layar penuh
-          </a>
+      {expanded && (
+        <div className="space-y-3 border-t px-3 pb-3 pt-3">
+          {s.description && <p className="text-sm text-muted-foreground">{s.description}</p>}
+        <div className="flex flex-wrap gap-2">
+          {priv?.material_path && (
+            <Button size="sm" variant="outline" onClick={() => open("session-materials", priv.material_path)}>
+              <FileText /> Materi PDF
+            </Button>
+          )}
+          {rec && (
+            <Button size="sm" variant="outline" onClick={() => setPlaying(!playing)}>
+              <PlayCircle /> {playing ? "Tutup rekaman" : "Tonton rekaman"}
+            </Button>
+          )}
         </div>
-      ) : (
-        <a href={rec.video_url} target="_blank" rel="noreferrer" className="block text-sm text-primary underline">Buka video</a>
-      ))}
 
-      <div className="space-y-2 rounded-xl bg-secondary/50 p-3 text-sm">
-        <p className="font-semibold">Tugas</p>
-        {sub ? (
-          <p className="break-all">
-            Terkirim: {sub.file_name} · {tanggal(sub.created_at)}{" "}
-            <button type="button" className="text-primary underline" onClick={() => open("assignments", sub.file_path)}>lihat</button>
-          </p>
+        {playing && rec && (embed ? (
+          <div className="space-y-2">
+            {/* Lebar penuh sampai tepi kartu agar tombol layar penuh tampil di HP */}
+            <div className="-mx-3 aspect-video bg-foreground">
+              <iframe
+                src={embed}
+                title={s.title}
+                className="h-full w-full"
+                allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
+                allowFullScreen
+              />
+            </div>
+            <a href={rec.video_url} target="_blank" rel="noreferrer" className="block text-sm text-primary underline">
+              Buka di aplikasi / layar penuh
+            </a>
+          </div>
         ) : (
-          <p className="text-muted-foreground">Belum ada tugas yang dikirim.</p>
-        )}
-        <input
-          ref={fileRef}
-          type="file"
-          accept={SUBMISSION_ACCEPT}
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            e.target.value = "";
-            if (f) upload(f);
-          }}
-        />
-        <Button size="sm" variant="outline" disabled={busy} onClick={() => fileRef.current?.click()}>
-          <Upload /> {busy ? "Mengunggah..." : sub ? "Ganti file tugas" : "Upload tugas"}
-        </Button>
-        <p className="text-xs text-muted-foreground">PDF, foto, Word, atau rekaman suara. Maksimal 20 MB.</p>
-      </div>
+          <a href={rec.video_url} target="_blank" rel="noreferrer" className="block text-sm text-primary underline">Buka video</a>
+        ))}
 
-      <div className="space-y-1 rounded-xl bg-secondary/50 p-3 text-sm">
-        <p className="font-semibold">Nilai</p>
-        {graded ? (
-          <>
-            {res!.grade != null && <p className="text-lg font-semibold text-primary">{res!.grade} / 100</p>}
-            {res!.feedback && <p className="whitespace-pre-line text-muted-foreground">{res!.feedback}</p>}
-          </>
-        ) : (
-          <p className="text-muted-foreground">Belum dinilai.</p>
-        )}
-      </div>
+        <div className="space-y-2 rounded-xl bg-secondary/50 p-3 text-sm">
+          <p className="font-semibold">Tugas</p>
+          {sub ? (
+            <p className="break-all">
+              Terkirim: {sub.file_name} · {tanggal(sub.created_at)}{" "}
+              <button type="button" className="text-primary underline" onClick={() => open("assignments", sub.file_path)}>lihat</button>
+            </p>
+          ) : (
+            <p className="text-muted-foreground">Belum ada tugas yang dikirim.</p>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept={SUBMISSION_ACCEPT}
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              e.target.value = "";
+              if (f) upload(f);
+            }}
+          />
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => fileRef.current?.click()}>
+            <Upload /> {busy ? "Mengunggah..." : sub ? "Ganti file tugas" : "Upload tugas"}
+          </Button>
+          <p className="text-xs text-muted-foreground">PDF, foto, Word, atau rekaman suara. Maksimal 20 MB.</p>
+        </div>
+
+        <div className="space-y-1 rounded-xl bg-secondary/50 p-3 text-sm">
+          <p className="font-semibold">Nilai</p>
+          {graded ? (
+            <>
+              {res!.grade != null && <p className="text-lg font-semibold text-primary">{res!.grade} / 100</p>}
+              {res!.feedback && <p className="whitespace-pre-line text-muted-foreground">{res!.feedback}</p>}
+            </>
+          ) : (
+            <p className="text-muted-foreground">Belum dinilai.</p>
+          )}
+        </div>
+        </div>
+      )}
     </li>
   );
 }
@@ -176,6 +189,7 @@ export function StudentSessions({
   renewSlug?: string;
 }) {
   const order = sessions.filter((x) => x.is_published).map((x) => x.id);
+  // Sesi berikutnya: sesi pertama yang belum punya rekaman dan sudah ada link Zoom-nya.
   const qc = useQueryClient();
   const key = ["student-sessions", classId, userId];
   const { data } = useQuery({
@@ -198,6 +212,10 @@ export function StudentSessions({
     },
   });
 
+  const nextId = sessions.find(
+    (x) => x.is_published && !data?.rec.some((r) => r.session_id === x.id) && !!data?.priv.find((p) => p.session_id === x.id)?.zoom_link,
+  )?.id;
+
   if (locked) {
     return (
       <div className="space-y-3">
@@ -210,7 +228,7 @@ export function StudentSessions({
   }
 
   return (
-    <ol className="space-y-4">
+    <ol className="space-y-2">
       {sessions.map((s) =>
         unlockedCount != null && order.indexOf(s.id) + 1 > unlockedCount ? (
           <li key={s.id} className="rounded-xl border border-dashed p-3 text-sm">
@@ -224,6 +242,7 @@ export function StudentSessions({
           <SessionItem
             key={s.id}
             s={s}
+            highlight={s.id === nextId}
             classId={classId}
             userId={userId}
             priv={data?.priv.find((x) => x.session_id === s.id)}
