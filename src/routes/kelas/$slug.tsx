@@ -30,10 +30,13 @@ export const Route = createFileRoute("/kelas/$slug")({
     const targetGender = c.target_gender || "all";
 siblingQuery = siblingQuery.eq("target_gender", targetGender);
 
-    const [{ data: siblings }, { data: counts }, settings] = await Promise.all([
+    const [{ data: siblings }, { data: counts }, settings, { data: subject }] = await Promise.all([
       siblingQuery,
       supabase.rpc("get_class_enrollment_counts"),
       context.queryClient.ensureQueryData(settingsQuery),
+      c.subject_id
+        ? supabase.from("subjects").select("id, name, slug").eq("id", c.subject_id).maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
 
     const enrollmentMap: Record<string, number> = {};
@@ -48,6 +51,7 @@ siblingQuery = siblingQuery.eq("target_gender", targetGender);
       siblings: siblings && siblings.length > 0 ? siblings : [c],
       enrollmentMap,
       teacherMap,
+      subject,
     };
   },
   head: ({ loaderData }) => ({
@@ -70,6 +74,7 @@ function ClassDetailPage() {
   const rombelList = data.siblings;
   const enrollmentMap = data.enrollmentMap;
   const teacherMap = data.teacherMap;
+  const subject = data.subject;
   const { data: publicTeachers } = useQuery(publicTeachersQuery);
 
   const [selectedId, setSelectedId] = useState<string>(initialClass.id);
@@ -106,9 +111,13 @@ function ClassDetailPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 sm:py-10">
-      <Link to="/kelas" className="inline-flex items-center gap-2 text-sm font-medium text-primary transition-colors hover:text-primary/75">
+      <Link
+        to={subject?.slug ? "/ilmu/$slug" : "/kelas"}
+        params={subject?.slug ? { slug: subject.slug } : undefined}
+        className="inline-flex items-center gap-2 text-sm font-medium text-primary transition-colors hover:text-primary/75"
+      >
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        Kembali ke katalog
+        Kembali ke katalog{subject?.name ? ` ${subject.name}` : ""}
       </Link>
 
       <div className="mt-5 flex flex-wrap gap-2">
