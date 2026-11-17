@@ -16,7 +16,7 @@ import { buildPackagePrices, getPackagePrice, monthlyChoices, packageCounts, pac
 import { DAYS, formatSchedule, slotsForSave, slotsOf, type Day, type ScheduleSlot } from "@/lib/schedule";
 import { settingsQuery } from "@/lib/queries";
 import { groupClasses, nextRombelName, splitRombelName, type ClassGroup } from "@/lib/class-groups";
-import { CATEGORY_OPTIONS, categoryLabel, classCategory } from "@/lib/class-category";
+import { CATEGORY_OPTIONS, DEFAULT_CATEGORY_DESC, categoryDescKey, categoryLabel, classCategory, type ClassCategory } from "@/lib/class-category";
 import { parseTeachers } from "@/lib/teachers";
 import { sb, field, slugify, useClasses, useSubjects } from "./shared";
 
@@ -112,6 +112,8 @@ export function KelasTab() {
   const teachers = parseTeachers(settings?.["teacher_list"]);
   const qc = useQueryClient();
   const [edit, setEdit] = useState<any | null>(null);
+  // Draf deskripsi kategori (Pra Tahsin / Tahsin) yang belum disimpan.
+  const [catDesc, setCatDesc] = useState<Record<string, string>>({});
   const [subjectId, setSubjectId] = useState("");
   const [genderFilter, setGenderFilter] = useState<GenderFilter>("all");
 
@@ -200,6 +202,15 @@ export function KelasTab() {
     setEdit({ ...base, mode: "program", group, applyPricing: false, initial: sharedSnapshot(base) });
   }
 
+  async function saveCatDescs() {
+    const rows = Object.entries(catDesc).map(([cat, v]) => ({ key: categoryDescKey(cat as ClassCategory), value: String(v).trim() }));
+    if (!rows.length) return;
+    const { error } = await sb.from("settings").upsert(rows);
+    if (error) return toast.error("Deskripsi kategori gagal disimpan: " + error.message);
+    setCatDesc({});
+    await qc.invalidateQueries({ queryKey: settingsQuery.queryKey });
+  }
+
   /** Simpan perubahan program ke semua rombel. Hanya kolom yang benar-benar diubah yang ditimpa. */
   async function saveProgram() {
     const { group, initial } = edit;
@@ -230,6 +241,7 @@ export function KelasTab() {
         const { error } = await sb.from("classes").update(update).eq("id", r.id);
         if (error) throw new Error(error.message.includes("duplicate") ? "Nama program bentrok dengan kelas lain. Ganti sedikit namanya." : error.message);
       }
+      await saveCatDescs();
       await refresh();
       setEdit(null);
       toast.success(`Program diperbarui untuk ${group.rombels.length} rombel.`);
@@ -274,6 +286,7 @@ export function KelasTab() {
     if (res.error) return toast.error(res.error.message.includes("duplicate") ? "Nama kelas ini sudah ada, ganti sedikit namanya." : res.error.message);
     const priv = await sb.from("class_private").upsert({ class_id: res.data.id, whatsapp_link: edit.whatsapp_link ?? "", zoom_link: edit.zoom_link ?? "" });
     if (priv.error) return toast.error("Kelas tersimpan, tetapi link grup/Zoom gagal: " + priv.error.message);
+    await saveCatDescs();
     toast.success(edit.id ? "Kelas diperbarui." : "Kelas dibuat.");
     setEdit(null);
     await refresh();
@@ -458,7 +471,7 @@ export function KelasTab() {
       })}
 
       {edit && (
-        <Dialog open onOpenChange={(o) => !o && setEdit(null)}>
+        <Dialog open onOpenChange={(o) => { if (!o) { setEdit(null); setCatDesc({}); } }}>
           <DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto">
             <DialogHeader><DialogTitle>{edit.mode === "program" ? "Ubah program" : edit.mode === "rombel" ? (edit.id ? "Ubah rombel" : "Rombel baru") : "Tambah kelas"}</DialogTitle></DialogHeader>
             <div className="space-y-3">
@@ -491,6 +504,17 @@ export function KelasTab() {
                     onChange={(e) => { const o = CATEGORY_OPTIONS.find((x) => x.value === e.target.value)!; setEdit((x: any) => ({ ...x, level_number: o.levelNumber, level_label: o.label })); }}>
                     {CATEGORY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select></div>
+                {(() => {
+                  const cat = classCategory(edit);
+                  const val = catDesc[cat] ?? (settings?.[categoryDescKey(cat)] ?? "");
+                  return (
+                    <div className="space-y-1">
+                      <Label>Deskripsi kategori {categoryLabel(edit)}</Label>
+                      <Textarea rows={3} value={val} placeholder={DEFAULT_CATEGORY_DESC[cat]} onChange={(e) => setCatDesc((d) => ({ ...d, [cat]: e.target.value }))} />
+                      <p className="text-xs text-muted-foreground">Tampil di bawah judul {categoryLabel(edit)} pada halaman Tahsin, berlaku untuk semua kelas {categoryLabel(edit)}. Kosongkan untuk memakai tulisan bawaan.</p>
+                    </div>
+                  );
+                })()}
                 <div className="space-y-1"><Label>Untuk</Label>
                   <select className={field} value={edit.target_gender ?? "all"} onChange={(e) => set("target_gender", e.target.value)}>
                     <option value="all">Umum</option><option value="ikhwan">Ikhwan</option><option value="akhwat">Akhwat</option>
@@ -598,7 +622,7 @@ export function KelasTab() {
               {showRombel && (
                 <div className="flex items-center justify-between border-t pt-3"><Label>Kelas aktif (tampil di website)</Label><Switch checked={edit.is_active ?? true} onCheckedChange={(v) => set("is_active", v)} /></div>
               )}
-              <div className="flex justify-end gap-2 pt-2"><Button variant="outline" onClick={() => setEdit(null)}>Batal</Button><Button onClick={save}>{mode === "program" ? "Simpan untuk semua rombel" : "Simpan"}</Button></div>
+              <div className="flex justify-end gap-2 pt-2"><Button variant="outline" onClick={() => { setEdit(null); setCatDesc({}); }}>Batal</Button><Button onClick={save}>{mode === "program" ? "Simpan untuk semua rombel" : "Simpan"}</Button></div>
             </div>
           </DialogContent>
         </Dialog>
